@@ -1,0 +1,23 @@
+{
+  "name": "8thlight_google-books_api",
+  "version": "1.0.0",
+  "description": "api for searching books",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Conley Johnson",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^16.4.2",
+    "react-dom": "^16.4.2",
+    "write": "^1.0.3"
+  },
+  "devDependencies": {
+    "auto-prefixer": "^0.4.2",
+    "chai": "^4.1.2",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "mocha": "^5.2.0",
+    "sass-loader": "^7.1.0"
+  }
+}
