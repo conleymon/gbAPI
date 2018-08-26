@@ -7,6 +7,7 @@ module.exports = {
       modules: [
         './node_modules',
         './src',
+        './src/js',
         './src/css'],
       extensions: [ '.tsx', '.ts', '.js', '.jsx','css','scss' ]
     },
