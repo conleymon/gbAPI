@@ -6,6 +6,7 @@ module.exports = {
     resolve: {
       modules: [
         './node_modules',
+        './my_modules',
         './src',
         './src/js',
         './src/css'],
