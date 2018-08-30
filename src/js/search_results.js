@@ -5,14 +5,15 @@ export class SearchResults extends Component{
         super(props)
     }
     render(){
-        console.log({data:this.props.data})
+        console.log({props:this.props})
         var data=this.props.data||[]
-        var formatItem=function(v){
+        var formatItem=(v)=>{
             var volume=v.volumeInfo
             return(
                 <div>
                     <div>{volume.title}</div>
                     <div>{volume.authors.join(', ')}</div>
+                    <div onClick={this.props.showDetails||(()=>{})}>More Info</div>
                 </div>
             )
         }

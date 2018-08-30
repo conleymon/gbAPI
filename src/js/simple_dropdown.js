@@ -7,8 +7,6 @@ export class SimpleDropdown extends Component{
     }
     render(){
         if(!(this.props.render && this.props.data)){return(<span>suggestions</span>)}
-        return(
-            this.render()
-        )
+        return this.props.render.call(this)
     }
 }

@@ -1,11 +1,14 @@
 import React, {Component} from 'react'
 import {Queue} from 'queue'
 import { SimpleDropdown } from 'simple_dropdown';
+import { constants } from 'app_constants'
+
+var {host}=constants
+//host='http://localhost:8080/web/8thlight/app/package.json'
+//host='http://localhost:8080/web/8thlight/sampleresponse.htm'
+
 /*
-*****Search for books placement if empty
-*****retrieve results from the api
-add prop for rendering commited results
-and fill out search results component
+
 
 
 
@@ -35,8 +38,6 @@ var throttleFunc=function(func,thresh=200){
     }
 }
 
-var host='https://www.googleapis.com/books/v1/volumes';
-//host='http://localhost:8080/web/8thlight/app/package.json'
 
 export class Search extends Component{
     constructor(props){
@@ -59,6 +60,7 @@ export class Search extends Component{
         this.commitedSearch=this.props.commitedSearch||(()=>{})
         this.getResultsQueue=new Queue()
         this.getResultThrottled=throttleFunc(this.getResults.bind(this))//throttles by time
+        this.testdata='hello'
     }
     focus(){this.searchRef.current.focus()}//access for developer
 
@@ -80,6 +82,7 @@ export class Search extends Component{
         //attach to the queue and run. if the queue is busy, schedule for attachment after completion.
         if(queue.status().queueLength===0){//if the queue has completed the last fetch, get a new one
             queue.fetch(host+'?q='+value)
+//            queue.fetch(host)
                 .add((p)=>{//check result ok
                     if(!p.result.ok){
                         p.control.change().interrupt()//change wipes out future steps, interrupt stops any steps that might be working.
@@ -88,18 +91,17 @@ export class Search extends Component{
                 })
                 .add((p)=>{return p.result.json()})
                 .add((p)=>{
-                    console.log({displayParams})
                     if(displayParams.withResult){
+                        console.log({displayParams,result:p.result})
                         displayParams.withResult(p.result)
                     }else{
                         console.log(p.result)
                     }
                 })
                 .kickStart()
-        }else if(!displayParams.noLoop){//if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
+        }else{//if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
             queue.finally(p=>{
                 p.control.clear().finally(()=>{})//finally persists and would cause a loop above if not replaced before restarting.
-                displayParams.noLoop=true
                 this.getResultThrottled(displayParams,e)
             })
         }
@@ -114,20 +116,25 @@ export class Search extends Component{
         var events=['blur','focus'] , input=this.searchRef.current , go=this.goRef.current
         events.forEach(
             (v)=>{
+                var input=this.searchRef.current
                 input.addEventListener(v,this.handleDefaultText.bind(this))
+                for(var k in this.advanced){
+                    input=this.advanced[k].ref.current
+                    input.addEventListener(v,this.handleDefaultText.bind(this))
+                }
             }
         )
         input.addEventListener('keyup',this.getResultThrottled.bind(this,{}))
         go.addEventListener('click',this.getResultThrottled.bind(this,{withResult:this.props.withResult}))
     }
     toggleAdvanced(){this.includeAdvanced=!this.includeAdvanced;this.forceUpdate()}
-    getField(){
 
-    }
     render(){
         var advanced=[]
+        var render=function(){return <div>hello</div>}
+        var testfunc=function(){ this.testData ='new variable';this.forceUpdate()}
         for(var k in this.advanced){
-            advanced.push(<div>{this.advanced[k].display}<input ref={this.advanced[k].ref}/><SimpleDropdown/></div>)
+            advanced.push(<div>{this.advanced[k].display}<input ref={this.advanced[k].ref}/><SimpleDropdown onClick={testfunc.bind( this)} data={this.testdata} render={render}/></div>)
         }
         return (
 

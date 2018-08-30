@@ -60,7 +60,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 12);
+/******/ 	return __webpack_require__(__webpack_require__.s = 13);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -261,9 +261,9 @@ process.umask = function() { return 0; };
 /* WEBPACK VAR INJECTION */(function(process) {
 
 if (process.env.NODE_ENV === 'production') {
-  module.exports = __webpack_require__(14);
-} else {
   module.exports = __webpack_require__(15);
+} else {
+  module.exports = __webpack_require__(16);
 }
 
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
@@ -577,7 +577,7 @@ module.exports = warning;
 var printWarning = function() {};
 
 if (process.env.NODE_ENV !== 'production') {
-  var ReactPropTypesSecret = __webpack_require__(16);
+  var ReactPropTypesSecret = __webpack_require__(17);
   var loggedTypeFailures = {};
 
   printWarning = function(text) {
@@ -827,7 +827,7 @@ module.exports = shallowEqual;
  * 
  */
 
-var isTextNode = __webpack_require__(19);
+var isTextNode = __webpack_require__(20);
 
 /*eslint-disable no-bitwise */
 
@@ -858,16 +858,1163 @@ module.exports = containsNode;
 /* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(13);
-module.exports = __webpack_require__(29);
+"use strict";
+/* WEBPACK VAR INJECTION */(function(module) {
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+/*
+Copyright Conley Johnson 2018
+License:MIT
+
+interrupt and stop should be tested. It may hang the queue upon restart
+interrupt().add(...) may need kickstart
+
+*/
+if (module && module.exports) {
+  var ObjectAnimator = __webpack_require__(29).ObjectAnimator;
+}
+//import {ObjectAnimator} from 'animator'
+
+var clearResults = function clearResults() {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  if (p.constructor === Array) {
+    p = { l: p };
+  }
+  var _p = p,
+      _p$l = _p.l,
+      l = _p$l === undefined ? [] : _p$l; //l stands for line as in queueLine, but any array fitting the queueLine format
+
+  l = arrayWrap(l);
+  var len = l.length;
+  for (var index = 0; index < len; index++) {
+    if (l[index].result !== undefined) {
+      delete l[index].result;
+    }
+    l[index].resolved = false;
+    l[index].initiated = false;
+    l[index].evaluation = null;
+  }
+  return l;
+};
+
+var arrayWrap = function arrayWrap(thing) {
+  if (Object.prototype.toString.call(thing) !== '[object Array]') {
+    return [thing];
+  } else {
+    return thing;
+  }
+};
+
+var format = function format(p) {
+  p = p ? p : function () {}; //if undefined, set with a function	
+  return clearResults(arrayWrap(p).map(function (val) {
+    if (val.constructor === Promise) {
+      val = Queue.promise(val);
+    }
+    if ((typeof val === 'undefined' ? 'undefined' : _typeof(val)) === 'object' && val.task && !val.preCondition && !val.postCondition && val.wait !== false) {
+      val.wait = true;
+    } //if a task is submitted in an object, without conditions and without wait, set wait to true. Otherwise, a function can be submitted raw
+    if (val.constructor === Queue) {
+      val = Queue.queue(val);
+    }
+    if (typeof val === 'function') {
+      val = { task: val };
+    }
+    var _val = val,
+        _val$task = _val.task,
+        task = _val$task === undefined ? function () {} : _val$task,
+        _val$preCondition = _val.preCondition,
+        preCondition = _val$preCondition === undefined ? function () {
+      return true;
+    } : _val$preCondition,
+        _val$postCondition = _val.postCondition,
+        postCondition = _val$postCondition === undefined ? function () {
+      return true;
+    } : _val$postCondition,
+        _val$wait = _val.wait,
+        wait = _val$wait === undefined ? false : _val$wait,
+        _val$name = _val.name,
+        name = _val$name === undefined ? undefined : _val$name,
+        _val$comment = _val.comment,
+        comment = _val$comment === undefined ? '' : _val$comment,
+        _val$sec = _val.sec,
+        sec = _val$sec === undefined ? 3600 : _val$sec,
+        _val$timeout = _val.timeout,
+        timeout = _val$timeout === undefined ? function () {} : _val$timeout,
+        _val$earlyTermination = _val.earlyTermination,
+        earlyTermination = _val$earlyTermination === undefined ? function () {} : _val$earlyTermination,
+        _val$getValue = _val.getValue,
+        getValue = _val$getValue === undefined ? false : _val$getValue,
+        _val$getValueFromTask = _val.getValueFromTask,
+        getValueFromTask = _val$getValueFromTask === undefined ? false : _val$getValueFromTask,
+        _val$queue = _val.queue,
+        queue = _val$queue === undefined ? false : _val$queue;
+
+    return { task: task, preCondition: preCondition, postCondition: postCondition, wait: wait, name: name, comment: task.toString(), sec: sec, timeout: timeout, earlyTermination: earlyTermination, getValue: getValue, getValueFromTask: getValueFromTask, initiated: false, resolved: false, queue: queue, subscriptions: new Map(), evaluation: null
+      //wait means, wait for a restart from the task. getvalue is an override function for retrieving the value to store after the promise is done. if not set, the argument provided by done is used
+    };
+  }));
+};
+
+//formfunctions
+function formToObject(form) {
+  var obj = {};
+  var elemarray;
+  if (typeof form === 'string' || typeof form === 'number') {
+    elemArray = document.getElementById(form).elements;
+  } else {
+    elemarray = form.elements;
+  }
+  var elemlen = elemarray.length;
+  var checknum; //for trying to convert strings to numbers
+  for (var i = 0; i < elemlen; i++) {
+    var n = elemarray[i].name.replace(/\[\]/g, '');
+    if (n == '') {
+      n = elemarray[i].id;
+    }
+    obj[n] = elemarray[i].value;
+    checknum = Number(obj[n]);if (!isNaN(checknum)) {
+      obj[n] = checknum;
+    }
+    if (elemarray[i].type == 'checkbox') {
+      obj[n] = elemarray[i].checked;
+    }
+    if (elemarray[i].type == 'select-multiple') {
+      obj[n] = getMultipleSelectValues(elemarray[i]);
+    }
+  }
+  return obj;
+}
+
+function getMultipleSelectValues(select) {
+  var result = [];
+  var options = select && select.options;
+  var opt;
+  for (var i = 0, iLen = options.length; i < iLen; i++) {
+    opt = options[i];
+    if (opt.selected) {
+      result.push(opt.value || opt.text);
+    }
+  }
+  result = result.map(cSTFV);
+  return result;
+}
+
+function cSTFV(val) {
+  //convert strings to functional values
+  if (val === 'true') {
+    return true;
+  }
+  if (val === 'false') {
+    return false;
+  }
+  var v = Number(val);
+  if (!isNaN(val)) {
+    return v;
+  } else {
+    return val;
+  }
+}
+//end form functions
+
+function Queue() {
+  var _this = this;
+
+  var queueLine = []; //where the tasks and conditions are stored
+  var queueMap = new Map(); //taskobj->name,index
+  //queueMap is for quick searches
+  var queueIndex = 0; //iteratorguide for the queue
+  var queueLength = 0; //number of tasks queued up
+  var queueHandle = false; //the handle for the timeouts
+  var timeoutHandle = false; //each 
+  var checkSpeed = 175; //interval for conditional checks
+  var checksRunning = false,
+      waitRunning = false;
+  var terminated = false; //stopped callback has been called, and it is locked, unless explicitly opened by calling a modifier (like add, or splice) or calling start({unterminate:true})
+  var callBack = function callBack() {};
+  var initialValue = undefined;
+  var subscriptions = new Map();
+  var repeat = false;
+
+  this.running = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    if (p.detail) {
+      return { checksRunning: checksRunning, waitRunning: waitRunning };
+    };return checksRunning || waitRunning;
+  };
+
+  this.setCheckSpeed = function (speed) {
+    checkSpeed = speed;return _this;
+  };
+
+  this.finally = function (cb) {
+    callBack = cb;
+    if (!more() && queueLength > 0 && queueLine[queueIndex].resolved) {
+      cb(_this.status(true));
+    };
+    return _this;
+  };
+
+  this.initVal = function (v) {
+    initialValue = v;
+  };
+
+  this.status = function () {
+    var control = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+    return {
+      currentTask: queueLine[queueIndex],
+      queueLength: queueLength,
+      queueIndex: queueIndex,
+      waitRunning: waitRunning,
+      checksRunning: checksRunning,
+      queueLine: queueLine.slice(),
+      control: control ? this : null
+    };
+  };
+
+  this.currentVal = function () {
+    return queueLength > 0 && queueLine[queueIndex] ? queueLine[queueIndex].result : initialValue;
+  };
+
+  this.lastVal = function () {
+    return queueLength > 0 && queueLine[queueLength - 1] ? queueLine[queueLength - 1].result : initialValue;
+  };
+
+  this.add = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var insert = arguments[1];
+    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
+    var actions = this.format(p);
+    if (!insert) {
+      queueLine.push.apply(queueLine, actions);
+    } else {
+      queueLine.splice.apply(queueLine, [queueIndex + 1, 0].concat(_toConsumableArray(actions)));
+    }
+    bookKeep();
+    return this;
+  };
+
+  this.insert = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
+    this.add(p, true);
+  };
+
+  this.repeat = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    repeat = true;
+  };
+
+  this.clear = function () {
+    this.stop({ clear: true });queueIndex = 0;queueLine.length = 0;bookKeep();return this;
+  };
+
+  this.stop = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    //wait bool, clear bool, terminate bool
+    clearTimeout(queueHandle);
+    checksRunning = false;waitRunning = false;
+    if (p.wait && !p.clear) {
+      waitRunning = true;
+    } else {
+      clearTimeout(timeoutHandle);
+    }
+    if (p.terminate) {
+      terminated = true;clearTimeout(timeoutHandle);
+      callBack(this.status(true));
+      this.publish();
+    }
+    return this;
+  };
+
+  this.kickStart = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    if (_this.running()) {
+      return;
+    }
+    _this.start();
+    return _this;
+  };
+
+  this.start = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    if (terminated && !p.unterminate) {/*console.error('this queue has been terminated. to restart, restart({unterminate:true}) queue.js start()')*/} else {
+      terminated = false;
+    }
+    if (p.indexMatch) {
+      if (p.indexMatch !== queueIndex) {
+        /*console.log('tried to restart:'+p.indexMatch+'. current index:'+queueIndex);*/return _this;
+      }
+    }
+    if (p.initialValue !== undefined) {
+      initialValue = p.initialValue;
+    } //only matters when starting from 0
+    if (p.callBack) {
+      _this.finally(p.callBack);
+    }
+    clearTimeout(queueHandle);clearTimeout(timeoutHandle);listen();
+    return _this;
+  };
+
+  var listen = function listen() {
+    checksRunning = true;waitRunning = true;
+    var q = queueLine[queueIndex];
+    if (!q.initiated) {
+      if (q.preCondition()) {
+        var result = q.task(getControlPackage());
+        if (result instanceof Promise) {
+          _this.insert(result);
+        } //should route through Queue.promise, where then->(result)=>p.done(result) will be attached
+        if (!q.wait) {
+          q.result = result;
+        }
+        q.initiated = true;
+      }
+      if (q.wait) {
+        _this.stop({ wait: true });return; //advance will be triggered at the end of the task. generally postCondition return true, but thats up to the developer
+      }
+    }
+    if (q.initiated) {
+      if (q.postCondition()) {
+        if (q.getValue) {
+          q.result = q.getValue(getControlPackage({ includeDone: false }));
+        };q.resolved = true;_this.moveOn();return;
+      }
+    }
+    queueHandle = setTimeout(function () {
+      listen();
+    }, checkSpeed);
+  };
+
+  var getControlPackage = function getControlPackage() {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var _p$includeDone = p.includeDone,
+        includeDone = _p$includeDone === undefined ? true : _p$includeDone;
+
+    var ret = {
+      control: _this,
+      done: function (indexMatch, result) {
+        var _this2 = this;
+
+        if (queueLine[indexMatch] === undefined) {
+          /*console.log('index '+indexMatch+' no longer exists in queue. queue.js listen()');*/return;
+        }
+        queueLine[indexMatch].result = result;
+        if (!waitRunning) {
+          return;
+        }
+        setTimeout(function () {
+          _this2.start({ indexMatch: indexMatch });
+        }, 0); //set timeout is to take it out of the call stack
+      }.bind(_this, queueIndex),
+      result: getPreviousResult(),
+      evaluate: function (task, val) {
+        task.evaluation = val;
+      }.bind(_this, queueLine[queueIndex])
+    };
+    if (!includeDone) {
+      delete ret.done;
+    }
+    return ret;
+  };
+
+  var finished = function finished() {
+    return queueIndex >= queueLength - 1 && terminated;
+  };
+
+  var more = function more() {
+    return queueLine[queueIndex + 1];
+  };
+
+  this.moveOn = function () {
+    //move to the next step if it exists. if not, terminate/ should be the only way to advance
+    _this.publishTask({ task: queueLine[queueIndex] });
+    if (!more() && !repeat) {
+      _this.stop({ terminate: true });return false;
+    }
+    if (!repeat) {
+      queueIndex++;
+    } else {
+      clearResults([queueLine[queueIndex]]);
+    }
+    repeat = false;
+    _this.start();
+    startTimeout();
+    return true;
+  };
+
+  var startTimeout = function startTimeout() {
+    clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(function () {
+      queueLine[queueIndex].timeout(getControlPackage({ includeDone: false }));
+      _this.moveOn(); //going to have to make this explicitly the devs responsibility or take this control off the table. 
+    }, queueLine[queueIndex].sec * 1000);
+  };
+  var getPreviousResult = function getPreviousResult() {
+    if (queueLine[queueIndex].getValueFromTask) {
+      var look = queueLine[queueIndex].getValueFromTask;
+      if (typeof look === 'string') {
+        for (var _m = 0; _m < queueLength; _m++) {
+          if (queueLine[_m].name === look) {
+            return queueLine[_m].result;
+          }
+        }
+      } else if (typeof look === 'number' && Math.abs(look) >= m) {
+        return queueLine[queueIndex - Math.abs(look)].result;
+      }
+    }
+    return queueIndex > 0 ? queueLine[queueIndex - 1].result : initialValue;
+  };
+
+  this.change = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    queueLine.splice(queueIndex + 1);
+    return _this.add(p); //add will bookkeep
+  };
+
+  this.interrupt = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //only performs the earlyTermination func..you have to then stop or moveon
+    var and = p.and;
+
+    if (queueLine[queueIndex]) {
+      queueLine[queueIndex].earlyTermination(getControlPackage({ includeDone: false }));
+    }
+    if (and === 'stop') {
+      _this.stop();
+    } else {
+      _this.moveOn();
+    }
+    return _this;
+  };
+
+  this.splice = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //splices queueLine, but uses search  to find the indexes
+    var _p$replacement = p.replacement,
+        replacement = _p$replacement === undefined ? [] : _p$replacement;
+
+    var _getIndexes = getIndexes(p),
+        from = _getIndexes.from,
+        to = _getIndexes.to; //{action, index}
+
+
+    if (from.index < queueIndex + 1) {
+      console.log('from index' + from.index + ' includes past/current tasks in the queue. setting from index to very next task index.');
+    }
+    from.index = queueIndex + 1;
+    if (from.index > to.index) {
+      console.error('indexes off->queue.js->splice()', { from: from, to: to });
+    } else {
+      var remove = to.index - from.index + 1; //plus 1 is to make it inclusive of the last element
+      queueLine.splice.apply(queueLine, [from.index, remove].concat(_this.format(replacement)));
+      bookKeep();
+    }
+    return _this;
+  };
+
+  this.delete = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    var found = this.find(p);
+    if (found.index < queueIndex + 1) {
+      console.error('task is past or current. Cannot be deleted');return this;
+    }
+    if (found) {
+      queueLine.splice(found.index, 1);bookKeep();
+    }
+    return this;
+  };
+
+  this.pop = function () {
+    if (queueIndex === queueLength - 1) {
+      console.error('tried to pop last task, which has already been initiated queue.js->pop');return _this;
+    }
+    queueLine.pop();bookKeep();return _this;
+  };
+
+  this.slice = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    //returns a new array with new shallow action object clones. setting their properties will not alter the action objects they were cloned from
+    //however,performing methods on the sliced action objects will operate on the originals
+    //and in fact some of the functions submitted will operate on important closure variables
+    var _ref = p.from || p.to ? getIndexes(p) : { from: { index: 0 } //if none submitted, splice the whole queueline 
+    },
+        from = _ref.from,
+        to = _ref.to;
+
+    if (to && from.index > to.index || !from) {
+      console.error('indexes off->queue.js->get()', { from: from, to: to });return [];
+    } else {
+      //
+      var args = to ? [from.index, to.index] : [from.index];
+      if (args.indexOf(undefined) !== -1) {
+        console.error(new Error('unable to find criteria'), from, to);return [];
+      }
+      var ret = clearResults(queueLine.slice.apply(queueLine, args).map(function (val) {
+        return Object.assign({}, val);
+      }));
+      ret.forEach(function (val) {
+        var newMap = new Map();
+        val.subscriptions.forEach(function (v, k) {
+          newMap.set(k, v);
+        });
+        val.subscriptions = newMap;
+      });
+      return ret;
+    }
+  };
+
+  var getIndexes = function getIndexes() {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    return { from: _this.find(p.from), to: _this.find(p.to) };
+  };
+
+  this.find = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    return queueMap.get(p.name || p.index || p.taskObj || p.task);
+    //you could actually extend this to search by any criteria in the queueline
+  };
+
+  var bookKeep = function bookKeep() {
+    //stores keys by name, index,task[the function to execute], action[the action package submitted] 
+    //tears map down and rebuilds because queueLine indexes shift
+    //modifying the queueLine calls bookKeep. renders containing loops order 5*A*N where A is the number of outer iterations and N is the number of tasks in the queue 
+    queueMap.clear();queueLength = queueLine.length;
+    for (var index = 0; index < queueLength; index++) {
+      var action = queueLine[index];
+      var pack = { action: action, index: index },
+          task = action.task,
+          name = action.name; //take out the name and task for setting in map
+      if (_this.find({ name: name })) {
+        console.error('duplicate names queue.js bookKeep', name, index);
+      }
+      if (_this.find({ taskObj: pack })) {
+        console.error('duplicate taskObjects. second dup. will be skipped. queue.js bookKeep', name, index);
+      }
+      if (_this.find({ task: task })) {
+        console.error('duplicate tasks, only the last inserted can be returned through find queue.js bookKeep', name, index);
+      }
+      if (name !== undefined) {
+        queueMap.set(name, pack);
+      }
+      queueMap.set(index, pack);
+      queueMap.set(action, pack); //duplicate packs??
+      queueMap.set(task, pack); //duplicate functions should be allowed.
+    }
+    if (!_this.allDone()) {
+      terminated = false;
+    }
+  };
+
+  this.clearResults = function () {
+    clearResults(queueLine);return _this;
+  };
+
+  this.reset = function () {
+    queueIndex = 0;_this.clearResults();return _this;
+  };
+
+  this.format = function (p) {
+    return format(p);
+  };
+
+  this.allDone = function () {
+    return queueLine.every(function (val) {
+      val.resolved;
+    });
+  };
+
+  this.subscribe = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var cb = p.cb;
+
+    if (typeof p === 'function') {
+      cb = p;
+    }
+    if (!cb) {
+      console.error('queue.js subscribe(func||{cb:func})->no function');
+    }
+    subscriptions.set(cb, 1);
+    return _this;
+  };
+
+  this.unsubscribe = function (p) {
+    var cb = p.cb;
+
+    if (typeof p === 'function') {
+      cb = p;
+    }
+    subscriptions.delete(cb);
+    return _this;
+  };
+
+  this.publish = function () {
+    var _this3 = this;
+
+    //publishes that the entire queue is finished
+    subscriptions.forEach(function (v, k) {
+      k(_this3.status());
+    });
+    subscriptions.clear();
+  };
+
+  this.subscribeTask = function (p) {
+    var name = p.name,
+        index = p.index,
+        cb = p.cb;
+
+    if (!cb) {
+      console.error('queue.js subscribeTask({name||index,cb})->no function to attach:', p);return _this;
+    }
+    var task = _this.find(p);
+    if (!task) {
+      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
+    }
+    if (task.resolved) {
+      cb(task);return _this;
+    }
+    task.subscriptions.set(cb, 1);
+    return _this;
+  };
+
+  this.unsubscribeTask = function (p) {
+    var name = p.name,
+        index = p.index,
+        cb = p.cb,
+        _p$check = p.check,
+        check = _p$check === undefined ? false : _p$check;
+
+    if (!cb) {
+      console.error('queue.js subscribeTask({name||index,cb})->no function to unattach:', p);return _this;
+    }
+    var task = _this.find(p);
+    if (!task) {
+      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
+    }
+    if (check) {
+      console.log('task', task, 'has callback' + cb.toString(), task.subscriptions.has(cb));
+    }
+    task.subscriptions.delete(cb, 1);
+    return _this;
+  };
+
+  this.publishTask = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var task = p.task;
+    if (!task) {
+      return this;
+    }
+    var subscriptions = task.subscriptions;
+    subscriptions.forEach(function (v, k) {
+      k(task);
+    });
+    subscriptions.clear();
+    return this;
+  };
+
+  this.all = function (p) {
+    _this.add(Queue.all(p));return _this;
+  };
+  this.insertAll = function (p) {
+    _this.insert(Queue.all(p));return _this;
+  };
+
+  this.race = function (p) {
+    _this.add(Queue.race(p));return _this;
+  };
+  this.insertRace = function (p) {
+    _this.insert(Queue.race(p));return _this;
+  };
+
+  this.wait = function (p) {
+    _this.add(Queue.wait(p));return _this;
+  };
+  this.insertWait = function (p) {
+    _this.insert(Queue.wait(p));return _this;
+  };
+
+  this.animate = function (p) {
+    _this.add(Queue.animate(p));return _this;
+  };
+  this.insertAnimate = function (p) {
+    _this.insert(Queue.animate(p));return _this;
+  };
+
+  this.transition = function (p) {
+    _this.add(Queue.transition(p));return _this;
+  };
+  this.insertTransition = function (p) {
+    _this.insert(Queue.transition(p));return _this;
+  };
+
+  this.blink = function (p) {
+    _this.add(Queue.blink(p));return _this;
+  };
+  this.insertBlink = function (p) {
+    _this.insert(Queue.blink(p));return _this;
+  };
+
+  this.listen = function (p) {
+    _this.add(Queue.listen(p));return _this;
+  };
+  this.insertListen = function (p) {
+    _this.insert(Queue.listen(p));return _this;
+  };
+
+  this.listenTask = function (p) {
+    _this.add(Queue.listenTask(p));return _this;
+  };
+  this.insertListenTask = function (p) {
+    _this.insert(Queue.listenTask(p));return _this;
+  };
+
+  this.ajax = function (p) {
+    _this.add(Queue.ajax(p));return _this;
+  };
+  this.insertAjax = function (p) {
+    _this.insert(Queue.ajax(p));return _this;
+  };
+
+  this.fetch = function (p) {
+    _this.add(Queue.fetch(p));return _this;
+  };
+  this.insertFetch = function (p) {
+    _this.insert(Queue.fetch(p));return _this;
+  };
+
+  this.loadIFrame = function (p) {
+    _this.add(Queue.loadIFrame(p));return _this;
+  };
+  this.insertLoadIFrame = function (p) {
+    _this.insert(Queue.loadIFrame(p));return _this;
+  };
+}
+
+Queue.wait = function (time) {
+  //time in ms
+  if ((typeof time === 'undefined' ? 'undefined' : _typeof(time)) === 'object' && time.from && time.to) {
+    var time = Math.random() * (time.to - time.from);
+  }
+  var task = function task(p) {
+    setTimeout(function () {
+      p.done(p.result);
+    }, time);
+  }; //pass previous result through					 
+  return { task: task };
+};
+
+Queue.queue = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //starts another Queue instance and hooks up the call back 
+  var queue = p.queue;
+
+  if (p.constructor === Queue) {
+    queue = p;
+  }
+  var task = function task(p) {
+    queue.clearResults().reset().finally(p.done).kickStart();
+  };
+  return Object.assign({ task: task, wait: true, queue: queue }, p);
+};
+
+Queue.promiseWrap = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //creates a promise, hooks this queue up to that promise (through finally) and returns the promise
+  var toDo = p.toDo; //async function, queue, promise
+
+  if (!toDo || !toDo.constructor) {
+    console.log('wrong argument in promiseWrap queue.js argument submitted:', p);return;
+  }
+  var resolve = function resolve(res) {
+    if (toDo.constructor === Queue) {
+      this.finally(res);
+    }
+    /*
+    tasks need a queue to activate them.
+    you might wrap an asynchronous function in a promise
+      hmm, queue should take asynchronous functions...
+    and other another promise?
+    */
+  };
+  return new Promise(resolve);
+};
+
+Queue.promise = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //wraps a queue in a task which does then->p.done 
+  var promise = p.promise;
+
+  if (p instanceof Promise) {
+    promise = p;
+  }
+  var task = function task(par) {
+    //executed when reached in the queue. 
+    promise.then(function (result) {
+      par.done(result);
+    }, function (result) {
+      par.done(result);
+    });
+  };
+  return Object.assign({ task: task, promise: promise, wait: true }, p);
+};
+
+Queue.fetch = function () {
+  var pack = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //must include 'fetchPackage' parameter  or p will be interpreted as the fetchPackage
+  if (!pack.fetchPackage) {
+    pack = { fetchPackage: pack };
+  } //use the package if it doesn't contain designated package for the fetch function
+
+  pack.task = function (p) {
+    var prom = fetch(pack.fetchPackage);
+    return prom;
+  }; //Queue promise will extract the promise result and pass it down the queue
+  pack.wait = false;
+  return pack;
+};
+Queue.ajax = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var _p$url = p.url,
+      url = _p$url === undefined ? '' : _p$url,
+      _p$data = p.data,
+      data = _p$data === undefined ? {} : _p$data,
+      _p$synch = p.synch,
+      synch = _p$synch === undefined ? true : _p$synch,
+      _p$method = p.method,
+      method = _p$method === undefined ? 'POST' : _p$method;
+
+  var xhr = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
+  var task = function task() {
+    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    var params;
+    if (data.nodeName && data.nodeName.toLowerCase() === 'form') {
+      if (data.action) {
+        url = data.action;
+      };
+      params = formToObject(data);
+    }
+    params = typeof data == 'string' ? data : Object.keys(data).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]);
+    }).join('&');
+
+    xhr.addEventListener('readystatechange', function () {
+      console.log(xhr.status);
+    });
+    xhr.addEventListener('load', function () {
+      par.done({ response: xhr.responseText, status: xhr.status });
+    });
+    xhr.open(method, url, synch);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(params);
+  };
+  return Object.assign({ task: task, wait: true, xhr: xhr }, p);
+};
+
+Queue.loadIFrame = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var url = p.url,
+      IFrame = p.IFrame,
+      src = p.src;
+
+  if (!url) {
+    url = src;
+  }
+  var task = function task() {
+    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    IFrame.addEventListener('load', function () {
+      par.done(IFrame);
+    });
+    IFrame.src = url;
+  };
+  return Object.assign({ task: task }, p);
+};
+
+Queue.listen = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var queue = p.queue,
+      _p$start = p.start,
+      start = _p$start === undefined ? false : _p$start;
+
+  if (p.constructor === Queue) {
+    queue = p;
+  }
+  var task = function task(p) {
+    if (queue.allDone()) {
+      p.done();return;
+    }
+    queue.subscribe({ cb: p.done });
+    if (start) {
+      queue.kickStart();
+    }
+  };
+  return Object.assign({ task: task, wait: true }, p);
+};
+
+Queue.listenTask = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var _p$queue = p.queue,
+      queue = _p$queue === undefined ? new Queue() : _p$queue,
+      _p$name = p.name,
+      name = _p$name === undefined ? 'null12345' : _p$name,
+      index = p.index,
+      _p$start2 = p.start,
+      start = _p$start2 === undefined ? false : _p$start2;
+
+  var task = function task(p) {
+    var t = queue.find({ name: name, index: index });
+    if (!t) {
+      console.error('queue.js Queue.listenTask({queue,name,index,start}) task not found for listening');
+    }
+    if (t && t.resolved) {
+      p.done(t.result);return;
+    }
+    queue.subscribeTask({ name: name, index: index, cb: p.done });
+    if (start) {
+      queue.kickStart();
+    }
+  };
+  return Object.assign({ task: task, wait: true }, p);
+};
+
+Queue.race = function (p) {
+  return Queue.all(p, true);
+};
+
+Queue.all = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var race = arguments[1];
+
+  var stalls = [];
+  var queue,
+      useP = p.constructor === Array; //is p the raw data or part of a package
+  var actions = (useP ? p : p.actions).map(function (val) {
+    return format(val);
+  });
+  if (actions.length === 0) {
+    return {};
+  }
+  var doneHolder = { done: function done() {} //place holder for the allTask resolution function
+  };var check = function check() {
+    return stalls.every(function (val) {
+      return val.resolved;
+    });
+  };
+  var retrieve = function retrieve(i, result) {
+    //result is a status() request submitted by the finally call after each stall queue finishes. So an allTask returns an array of all the final status requests of all it's tasks.
+    stalls[i].result = result;
+    stalls[i].resolved = true;
+    if (race) {
+      doneHolder.done(result);check = function check() {
+        return false;
+      };
+    }
+    if (check()) {
+      doneHolder.done(stalls.map(function (val) {
+        return val.result;
+      }));
+    }
+  };
+  actions.forEach(function (val, i) {
+    queue = new Queue().add(val).finally(retrieve.bind(null, i)); //queues should call back with the status report
+    stalls[i] = { queue: queue, result: undefined, resolved: false };
+  });
+  var earlyTermination = function earlyTermination() {
+    stalls.forEach(function (val) {
+      if (val.queue) {
+        val.queue.interrupt({ and: 'stop' });
+      }
+    });
+  };
+  var task = function task(p) {
+    doneHolder.done = p.done;
+    stalls.forEach(function (val) {
+      val.queue.start();
+    });
+  };
+  return Object.assign({ task: task, earlyTermination: earlyTermination }, useP ? {} : p);
+};
+
+Queue.transition = function () {
+  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var node = par.node,
+      style = par.style,
+      _par$duration = par.duration,
+      duration = _par$duration === undefined ? 1 : _par$duration,
+      _par$timing = par.timing,
+      timing = _par$timing === undefined ? 'ease-in-out' : _par$timing,
+      _par$synch = par.synch,
+      synch = _par$synch === undefined ? true : _par$synch,
+      _par$contours = par.contours,
+      contours = _par$contours === undefined ? {} : _par$contours;
+
+  var task = function task(p) {
+    //hook up the function
+    var evFunc = function evFunc() {
+      node.removeEventListener('transitionend', evFunc);
+      p.done();
+    };
+    node.addEventListener('transitionend', evFunc);
+    //set the transition
+    if (synch && style.transform) {
+      var _Queue$synchTransform = Queue.synchTransform({ orig: node.style.transform, dest: style.transform }),
+          dest = _Queue$synchTransform.dest;
+
+      style.transform = dest;
+    }
+    var transProps = [];
+    for (var k in style) {
+      transProps.push(k + ' ' + duration + 's ' + timing);
+    }
+    Object.assign(node.style, { transition: transProps.join(', ') }, style);
+    //set the style
+  };
+  return Object.assign({ task: task, wait: true }, par);
+};
+
+Queue.animate = function () {
+  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  if (!ObjectAnimator) {
+    console.error('You need the animator dependency to use this method.');return function () {};
+  }
+  var animation = new ObjectAnimator(); //if the conductor is on the window, it will be used. otherwise, either the animator will run on it's own, or a dev will need to store a conductor somewhere then use " var animation=new ObjectAnimator({conductor})"
+  var task = function task(p) {
+    par.postAnim = function () {
+      p.done();
+    };
+    animation.loadAnimation(par).animate();
+  };
+  return Object.assign({ task: task, wait: true, earlyTermination: function earlyTermination() {
+      animation.stop();
+    }, animation: animation }, par);
+};
+
+Queue.blink = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var node = p.node,
+      _p$repeat = p.repeat,
+      repeat = _p$repeat === undefined ? 1 : _p$repeat,
+      _p$interval = p.interval,
+      interval = _p$interval === undefined ? 500 : _p$interval,
+      _p$proportion = p.proportion,
+      proportion = _p$proportion === undefined ? .5 : _p$proportion;
+
+  var tasks = [];
+  for (var i = 0; i < repeat; i++) {
+    tasks.push(function () {
+      node.style.opacity = 0;
+    }, Queue.wait(interval * (1 - proportion)), function () {
+      node.style.opacity = 1;
+    }, Queue.wait(interval * proportion));
+  }
+  tasks.pop(); //no need to wait after the last blink
+  return tasks;
+};
+
+Queue.synchTransform = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //orig and dest should be strings
+  var orig = p.orig,
+      dest = p.dest,
+      origArray = [],
+      destArray = [],
+      origU = new Map(),
+      destU = new Map(),
+      origVal;
+
+  var breakOrig = orig.match(/[a-zA-Z]+\([^\)]*\)/g),
+      breakDest = dest.match(/[a-zA-Z]+\([^\)]*\)/g);
+  if (breakOrig) {
+    breakOrig.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');origU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakOrig = [];
+  }
+  if (breakDest) {
+    breakDest.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');destU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakDest = [];
+  }
+  origU.forEach(function (v, k) {
+    destArray.push(destU.has(k) ? destU.get(k) : origU.get(k));
+    origArray.push(origU.get(k));
+    destU.delete(k);
+  });
+  destU.forEach(function (v, k) {
+    destArray.push(destU.get(k));
+    origArray.push(origU.has(k) ? origU.get(k) : transformDefaultTable[k]);
+  });
+  return { orig: origArray.join(' '), dest: destArray.join(' ') };
+};
+
+//if(window.wait===undefined){window.wait=Queue.wait}
+//if(window.animate===undefined){window.animate=Queue.animate}
+//if(window.transition===undefined){window.transition=Queue.transition}
+
+var transformDefaultTable = {
+  //matrices and perspective must be set already to animate
+  translate: 'translate(0,0)',
+  translate3d: 'translate3d(0,0,0)',
+  translateX: 'translateX(0)',
+  translateY: 'translateY(0)',
+  translateZ: 'translateZ(0)',
+  scale: 'scale(1,1)',
+  scale3d: 'scale3d(1,1,1)',
+  scaleX: 'scaleX(1)',
+  scaleY: 'scaleY(1)',
+  scaleZ: 'scaleZ(1)',
+  rotate: 'rotate(0deg)',
+  rotate3d: 'rotate3d(0,0,0,0deg)',
+  rotateX: 'rotateX(0deg)',
+  rotateY: 'rotateY(0deg)',
+  rotateZ: 'rotateZ(0deg)',
+  skew: 'skew(0deg,0deg)',
+  skewX: 'skewX(0deg)',
+  skewY: 'skewY(0deg)'
+};
+exports.Queue = Queue;
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(28)(module)))
 
 /***/ }),
 /* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
+__webpack_require__(14);
+module.exports = __webpack_require__(34);
+
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
 "use strict";
 
+
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -875,15 +2022,15 @@ var _react = __webpack_require__(1);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _reactDom = __webpack_require__(17);
+var _reactDom = __webpack_require__(18);
 
 var _reactDom2 = _interopRequireDefault(_reactDom);
 
-var _search = __webpack_require__(26);
+var _search = __webpack_require__(27);
 
-var _search_results = __webpack_require__(27);
+var _search_results = __webpack_require__(32);
 
-var _books_container = __webpack_require__(28);
+var _search_container = __webpack_require__(33);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -893,44 +2040,47 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var Books = function (_Component) {
-    _inherits(Books, _Component);
+var SearchComponent = function (_Component) {
+    _inherits(SearchComponent, _Component);
 
-    function Books(props) {
-        _classCallCheck(this, Books);
+    function SearchComponent(props) {
+        _classCallCheck(this, SearchComponent);
 
-        var _this = _possibleConstructorReturn(this, (Books.__proto__ || Object.getPrototypeOf(Books)).call(this, props));
+        var _this = _possibleConstructorReturn(this, (SearchComponent.__proto__ || Object.getPrototypeOf(SearchComponent)).call(this, props));
 
         _this.searchResultsRef = _react2.default.createRef();
         _this.resultsData = [];
         return _this;
     }
 
-    _createClass(Books, [{
+    _createClass(SearchComponent, [{
         key: 'displayResults',
         value: function displayResults(data) {
             //should come in with results from search
-            this.resultsData = data.items;
+
+            this.resultsData = data.items ? data.items : [data];
             this.forceUpdate();
         }
     }, {
         key: 'render',
         value: function render() {
-            console.log(this.resultsData);
             return _react2.default.createElement(
-                _books_container.BooksContainer,
+                _search_container.SearchContainer,
                 null,
                 _react2.default.createElement(_search.Search, { withResult: this.displayResults.bind(this) }),
-                _react2.default.createElement(_search_results.SearchResults, { data: this.resultsData, ref: this.searchResultsRef })
+                _react2.default.createElement(_search_results.SearchResults, _extends({
+                    data: this.resultsData,
+                    ref: this.searchResultsRef
+                }, this.props))
             );
         }
     }]);
 
-    return Books;
+    return SearchComponent;
 }(_react.Component);
 
-var VolumeDetails = function (_component) {
-    _inherits(VolumeDetails, _component);
+var VolumeDetails = function (_Component2) {
+    _inherits(VolumeDetails, _Component2);
 
     function VolumeDetails(props) {
         _classCallCheck(this, VolumeDetails);
@@ -944,20 +2094,20 @@ var VolumeDetails = function (_component) {
             return _react2.default.createElement(
                 'span',
                 null,
-                this.props.data
+                'some data'
             );
         }
     }]);
 
     return VolumeDetails;
-}(component);
+}(_react.Component);
 /*
 simply speaking, you'll render the details and the reader the same way
 but if allowed to render to the body, you'll append an element to the body, rendered in react, positioned absolutely, covering and with index set to be in front of anything else.
 
 */
 
-window.BooksAPI = function () {
+window.VolumesAPI = function () {
     this.container = document.querySelector('body');
     this.detailsContainment = 'contained';
     this.readerContainment = 'contained';
@@ -971,18 +2121,35 @@ window.BooksAPI = function () {
         if (container) {
             this.container = container;
         }
-        _reactDom2.default.render(_react2.default.createElement(Books, null), this.container);
+        _reactDom2.default.render(_react2.default.createElement(SearchComponent, { showDetails: this.showDetails.bind(this) }), this.container);
     };
     this.showDetails = function (data) {
-        _reactDom2.default.render(_react2.default.createElement(VolumeDetails, { data: data }), this.detailsPane)(this.detailsContainment === 'fullcoverage' ? document.body : this.container).appendChild(this.detailsPane);
+        console.log({ data: data });
+        var useContainer = this.detailsContainment === 'fullCoverage' ? document.body : this.container;
+        var style = { zIndex: getHighestZ(useContainer) };
+        _reactDom2.default.render(_react2.default.createElement(VolumeDetails, { data: data, style: style }), this.detailsPane);
+        useContainer.appendChild(this.detailsPane);
     };
     this.hideDetails = function () {
         (document.body.contains(this.detailsPane) ? document.body : this.container).removeChild(this.detailsPane);
     };
 };
+var getHighestZ = function getHighestZ(node) {
+    if (!node.children.length) {
+        return 1;
+    }
+    var mark = -99999999;
+    var markHighest = function markHighest(v) {
+        if (v.style && v.style.zindex > mark) {
+            mark = v.style.zIndex;
+        }
+    };
+    Array.prototype.slice.call(node.children).forEach(markHighest);
+    return mark;
+};
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1011,7 +2178,7 @@ assign:k}},Y={default:X},Z=Y&&X||Y;module.exports=Z.default?Z.default:Z;
 
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2505,7 +3672,7 @@ module.exports = react;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2524,7 +3691,7 @@ module.exports = ReactPropTypesSecret;
 
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2562,15 +3729,15 @@ if (process.env.NODE_ENV === 'production') {
   // DCE check should happen before ReactDOM bundle executes so that
   // DevTools can report bad minification during injection.
   checkDCE();
-  module.exports = __webpack_require__(18);
+  module.exports = __webpack_require__(19);
 } else {
-  module.exports = __webpack_require__(21);
+  module.exports = __webpack_require__(22);
 }
 
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2817,7 +3984,7 @@ var Bi={default:wi},Ci=Bi&&wi||Bi;module.exports=Ci.default?Ci.default:Ci;
 
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2832,7 +3999,7 @@ var Bi={default:wi},Ci=Bi&&wi||Bi;module.exports=Ci.default?Ci.default:Ci;
  * @typechecks
  */
 
-var isNode = __webpack_require__(20);
+var isNode = __webpack_require__(21);
 
 /**
  * @param {*} object The object to check.
@@ -2845,7 +4012,7 @@ function isTextNode(object) {
 module.exports = isTextNode;
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2873,7 +4040,7 @@ function isNode(object) {
 module.exports = isNode;
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2905,8 +4072,8 @@ var getActiveElement = __webpack_require__(9);
 var shallowEqual = __webpack_require__(10);
 var containsNode = __webpack_require__(11);
 var emptyObject = __webpack_require__(5);
-var hyphenateStyleName = __webpack_require__(22);
-var camelizeStyleName = __webpack_require__(24);
+var hyphenateStyleName = __webpack_require__(23);
+var camelizeStyleName = __webpack_require__(25);
 
 // Relying on the `invariant()` implementation lets us
 // have preserve the format and params in the www builds.
@@ -20312,7 +21479,7 @@ module.exports = reactDom;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20327,7 +21494,7 @@ module.exports = reactDom;
 
 
 
-var hyphenate = __webpack_require__(23);
+var hyphenate = __webpack_require__(24);
 
 var msPattern = /^ms-/;
 
@@ -20354,7 +21521,7 @@ function hyphenateStyleName(string) {
 module.exports = hyphenateStyleName;
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20390,7 +21557,7 @@ function hyphenate(string) {
 module.exports = hyphenate;
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20405,7 +21572,7 @@ module.exports = hyphenate;
 
 
 
-var camelize = __webpack_require__(25);
+var camelize = __webpack_require__(26);
 
 var msPattern = /^-ms-/;
 
@@ -20433,7 +21600,7 @@ function camelizeStyleName(string) {
 module.exports = camelizeStyleName;
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20468,7 +21635,7 @@ function camelize(string) {
 module.exports = camelize;
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20485,9 +21652,11 @@ var _react = __webpack_require__(1);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _queue = __webpack_require__(34);
+var _queue = __webpack_require__(12);
 
-var _simple_dropdown = __webpack_require__(37);
+var _simple_dropdown = __webpack_require__(30);
+
+var _app_constants = __webpack_require__(31);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -20497,11 +21666,12 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+var host = _app_constants.constants.host;
+//host='http://localhost:8080/web/8thlight/app/package.json'
+//host='http://localhost:8080/web/8thlight/sampleresponse.htm'
+
 /*
-*****Search for books placement if empty
-*****retrieve results from the api
-add prop for rendering commited results
-and fill out search results component
+
 
 
 
@@ -20521,6 +21691,7 @@ have each field  in a div with height=1.5em., overflow visible
 
 or maybe this doesn't have to be time dependent? 
 */
+
 var throttleFunc = function throttleFunc(func) {
     var thresh = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 200;
 
@@ -20536,9 +21707,6 @@ var throttleFunc = function throttleFunc(func) {
         }, thresh);
     };
 };
-
-var host = 'https://www.googleapis.com/books/v1/volumes';
-//host='http://localhost:8080/web/8thlight/app/package.json'
 
 var Search = exports.Search = function (_Component) {
     _inherits(Search, _Component);
@@ -20567,6 +21735,7 @@ var Search = exports.Search = function (_Component) {
         _this.commitedSearch = _this.props.commitedSearch || function () {};
         _this.getResultsQueue = new _queue.Queue();
         _this.getResultThrottled = throttleFunc(_this.getResults.bind(_this)); //throttles by time
+        _this.testdata = 'hello';
         return _this;
     }
 
@@ -20602,7 +21771,9 @@ var Search = exports.Search = function (_Component) {
             //attach to the queue and run. if the queue is busy, schedule for attachment after completion.
             if (queue.status().queueLength === 0) {
                 //if the queue has completed the last fetch, get a new one
-                queue.fetch(host + '?q=' + value).add(function (p) {
+                queue.fetch(host + '?q=' + value)
+                //            queue.fetch(host)
+                .add(function (p) {
                     //check result ok
                     if (!p.result.ok) {
                         p.control.change().interrupt(); //change wipes out future steps, interrupt stops any steps that might be working.
@@ -20611,18 +21782,17 @@ var Search = exports.Search = function (_Component) {
                 }).add(function (p) {
                     return p.result.json();
                 }).add(function (p) {
-                    console.log({ displayParams: displayParams });
                     if (displayParams.withResult) {
+                        console.log({ displayParams: displayParams, result: p.result });
                         displayParams.withResult(p.result);
                     } else {
                         console.log(p.result);
                     }
                 }).kickStart();
-            } else if (!displayParams.noLoop) {
+            } else {
                 //if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
                 queue.finally(function (p) {
                     p.control.clear().finally(function () {}); //finally persists and would cause a loop above if not replaced before restarting.
-                    displayParams.noLoop = true;
                     _this2.getResultThrottled(displayParams, e);
                 });
             }
@@ -20648,7 +21818,12 @@ var Search = exports.Search = function (_Component) {
                 input = this.searchRef.current,
                 go = this.goRef.current;
             events.forEach(function (v) {
+                var input = _this3.searchRef.current;
                 input.addEventListener(v, _this3.handleDefaultText.bind(_this3));
+                for (var k in _this3.advanced) {
+                    input = _this3.advanced[k].ref.current;
+                    input.addEventListener(v, _this3.handleDefaultText.bind(_this3));
+                }
             });
             input.addEventListener('keyup', this.getResultThrottled.bind(this, {}));
             go.addEventListener('click', this.getResultThrottled.bind(this, { withResult: this.props.withResult }));
@@ -20659,19 +21834,26 @@ var Search = exports.Search = function (_Component) {
             this.includeAdvanced = !this.includeAdvanced;this.forceUpdate();
         }
     }, {
-        key: 'getField',
-        value: function getField() {}
-    }, {
         key: 'render',
         value: function render() {
             var advanced = [];
+            var render = function render() {
+                return _react2.default.createElement(
+                    'div',
+                    null,
+                    'hello'
+                );
+            };
+            var testfunc = function testfunc() {
+                this.testData = 'new variable';this.forceUpdate();
+            };
             for (var k in this.advanced) {
                 advanced.push(_react2.default.createElement(
                     'div',
                     null,
                     this.advanced[k].display,
                     _react2.default.createElement('input', { ref: this.advanced[k].ref }),
-                    _react2.default.createElement(_simple_dropdown.SimpleDropdown, null)
+                    _react2.default.createElement(_simple_dropdown.SimpleDropdown, { onClick: testfunc.bind(this), data: this.testdata, render: render })
                 ));
             }
             return _react2.default.createElement(
@@ -20702,1860 +21884,7 @@ var Search = exports.Search = function (_Component) {
 }(_react.Component);
 
 /***/ }),
-/* 27 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-exports.SearchResults = undefined;
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _react = __webpack_require__(1);
-
-var _react2 = _interopRequireDefault(_react);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var SearchResults = exports.SearchResults = function (_Component) {
-    _inherits(SearchResults, _Component);
-
-    function SearchResults(props) {
-        _classCallCheck(this, SearchResults);
-
-        return _possibleConstructorReturn(this, (SearchResults.__proto__ || Object.getPrototypeOf(SearchResults)).call(this, props));
-    }
-
-    _createClass(SearchResults, [{
-        key: 'render',
-        value: function render() {
-            console.log({ data: this.props.data });
-            var data = this.props.data || [];
-            var formatItem = function formatItem(v) {
-                var volume = v.volumeInfo;
-                return _react2.default.createElement(
-                    'div',
-                    null,
-                    _react2.default.createElement(
-                        'div',
-                        null,
-                        volume.title
-                    ),
-                    _react2.default.createElement(
-                        'div',
-                        null,
-                        volume.authors.join(', ')
-                    )
-                );
-            };
-            //console.log({data:data.map(formatItem)})
-            return data.map(formatItem);
-        }
-    }]);
-
-    return SearchResults;
-}(_react.Component);
-
-/***/ }),
 /* 28 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-exports.BooksContainer = undefined;
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _react = __webpack_require__(1);
-
-var _react2 = _interopRequireDefault(_react);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var BooksContainer = exports.BooksContainer = function (_Component) {
-    _inherits(BooksContainer, _Component);
-
-    function BooksContainer(props) {
-        _classCallCheck(this, BooksContainer);
-
-        return _possibleConstructorReturn(this, (BooksContainer.__proto__ || Object.getPrototypeOf(BooksContainer)).call(this, props));
-    }
-
-    _createClass(BooksContainer, [{
-        key: 'render',
-        value: function render() {
-            return _react2.default.createElement(
-                'div',
-                null,
-                this.props.children
-            );
-        }
-    }]);
-
-    return BooksContainer;
-}(_react.Component);
-
-/***/ }),
-/* 29 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// style-loader: Adds some css to the DOM by adding a <style> tag
-
-// load the styles
-var content = __webpack_require__(30);
-if(typeof content === 'string') content = [[module.i, content, '']];
-// Prepare cssTransformation
-var transform;
-
-var options = {"hmr":true}
-options.transform = transform
-// add the styles to the DOM
-var update = __webpack_require__(32)(content, options);
-if(content.locals) module.exports = content.locals;
-// Hot Module Replacement
-if(false) {
-	// When the styles change, update the <style> tags
-	if(!content.locals) {
-		module.hot.accept("!!../../../../../node_modules/css-loader/index.js!../../../../../node_modules/postcss-loader/lib/index.js!../../node_modules/sass-loader/lib/loader.js!./style.scss", function() {
-			var newContent = require("!!../../../../../node_modules/css-loader/index.js!../../../../../node_modules/postcss-loader/lib/index.js!../../node_modules/sass-loader/lib/loader.js!./style.scss");
-			if(typeof newContent === 'string') newContent = [[module.id, newContent, '']];
-			update(newContent);
-		});
-	}
-	// When the module is disposed, remove the <style> tags
-	module.hot.dispose(function() { update(); });
-}
-
-/***/ }),
-/* 30 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports = module.exports = __webpack_require__(31)(undefined);
-// imports
-
-
-// module
-exports.push([module.i, "/*\r\nmodifier--\r\nelement__\r\n*/\nbody, .cover {\n  position: absolute;\n  height: 100%;\n  width: 100%; }\n\nhtml, body {\n  margin: 0;\n  overflow: hidden; }\n  html body, body body {\n    background-color: #444; }\n\n.button {\n  box-shadow: 0px 2px 2px;\n  font-size: 1.3em;\n  border: radius 0.2em; }\n  .button--regular {\n    color: white;\n    background-image: linear-gradient(30deg, #3c501b 10%, #267257 20%); }\n\n/*\r\nalright, an app component is to be inserted inside a display-flex container.\r\n    if you set the flex basis of the component to content, then you can expand and contract the content window...\r\n    what to do if a row/column is too long? I think there's a no wrap property somewhere that may help\r\n\r\n*/\n.flex {\n  display: flex; }\n\n.flush {\n  margin: 0px; }\n\n.canvasAndPlayerContainer {\n  flex-grow: 5;\n  display: flex;\n  flex-direction: column; }\n", ""]);
-
-// exports
-
-
-/***/ }),
-/* 31 */
-/***/ (function(module, exports) {
-
-/*
-	MIT License http://www.opensource.org/licenses/mit-license.php
-	Author Tobias Koppers @sokra
-*/
-// css base code, injected by the css-loader
-module.exports = function(useSourceMap) {
-	var list = [];
-
-	// return the list of modules as css string
-	list.toString = function toString() {
-		return this.map(function (item) {
-			var content = cssWithMappingToString(item, useSourceMap);
-			if(item[2]) {
-				return "@media " + item[2] + "{" + content + "}";
-			} else {
-				return content;
-			}
-		}).join("");
-	};
-
-	// import a list of modules into the list
-	list.i = function(modules, mediaQuery) {
-		if(typeof modules === "string")
-			modules = [[null, modules, ""]];
-		var alreadyImportedModules = {};
-		for(var i = 0; i < this.length; i++) {
-			var id = this[i][0];
-			if(typeof id === "number")
-				alreadyImportedModules[id] = true;
-		}
-		for(i = 0; i < modules.length; i++) {
-			var item = modules[i];
-			// skip already imported module
-			// this implementation is not 100% perfect for weird media query combinations
-			//  when a module is imported multiple times with different media queries.
-			//  I hope this will never occur (Hey this way we have smaller bundles)
-			if(typeof item[0] !== "number" || !alreadyImportedModules[item[0]]) {
-				if(mediaQuery && !item[2]) {
-					item[2] = mediaQuery;
-				} else if(mediaQuery) {
-					item[2] = "(" + item[2] + ") and (" + mediaQuery + ")";
-				}
-				list.push(item);
-			}
-		}
-	};
-	return list;
-};
-
-function cssWithMappingToString(item, useSourceMap) {
-	var content = item[1] || '';
-	var cssMapping = item[3];
-	if (!cssMapping) {
-		return content;
-	}
-
-	if (useSourceMap && typeof btoa === 'function') {
-		var sourceMapping = toComment(cssMapping);
-		var sourceURLs = cssMapping.sources.map(function (source) {
-			return '/*# sourceURL=' + cssMapping.sourceRoot + source + ' */'
-		});
-
-		return [content].concat(sourceURLs).concat([sourceMapping]).join('\n');
-	}
-
-	return [content].join('\n');
-}
-
-// Adapted from convert-source-map (MIT)
-function toComment(sourceMap) {
-	// eslint-disable-next-line no-undef
-	var base64 = btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap))));
-	var data = 'sourceMappingURL=data:application/json;charset=utf-8;base64,' + base64;
-
-	return '/*# ' + data + ' */';
-}
-
-
-/***/ }),
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/*
-	MIT License http://www.opensource.org/licenses/mit-license.php
-	Author Tobias Koppers @sokra
-*/
-
-var stylesInDom = {};
-
-var	memoize = function (fn) {
-	var memo;
-
-	return function () {
-		if (typeof memo === "undefined") memo = fn.apply(this, arguments);
-		return memo;
-	};
-};
-
-var isOldIE = memoize(function () {
-	// Test for IE <= 9 as proposed by Browserhacks
-	// @see http://browserhacks.com/#hack-e71d8692f65334173fee715c222cb805
-	// Tests for existence of standard globals is to allow style-loader
-	// to operate correctly into non-standard environments
-	// @see https://github.com/webpack-contrib/style-loader/issues/177
-	return window && document && document.all && !window.atob;
-});
-
-var getElement = (function (fn) {
-	var memo = {};
-
-	return function(selector) {
-		if (typeof memo[selector] === "undefined") {
-			var styleTarget = fn.call(this, selector);
-			// Special case to return head of iframe instead of iframe itself
-			if (styleTarget instanceof window.HTMLIFrameElement) {
-				try {
-					// This will throw an exception if access to iframe is blocked
-					// due to cross-origin restrictions
-					styleTarget = styleTarget.contentDocument.head;
-				} catch(e) {
-					styleTarget = null;
-				}
-			}
-			memo[selector] = styleTarget;
-		}
-		return memo[selector]
-	};
-})(function (target) {
-	return document.querySelector(target)
-});
-
-var singleton = null;
-var	singletonCounter = 0;
-var	stylesInsertedAtTop = [];
-
-var	fixUrls = __webpack_require__(33);
-
-module.exports = function(list, options) {
-	if (typeof DEBUG !== "undefined" && DEBUG) {
-		if (typeof document !== "object") throw new Error("The style-loader cannot be used in a non-browser environment");
-	}
-
-	options = options || {};
-
-	options.attrs = typeof options.attrs === "object" ? options.attrs : {};
-
-	// Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
-	// tags it will allow on a page
-	if (!options.singleton && typeof options.singleton !== "boolean") options.singleton = isOldIE();
-
-	// By default, add <style> tags to the <head> element
-	if (!options.insertInto) options.insertInto = "head";
-
-	// By default, add <style> tags to the bottom of the target
-	if (!options.insertAt) options.insertAt = "bottom";
-
-	var styles = listToStyles(list, options);
-
-	addStylesToDom(styles, options);
-
-	return function update (newList) {
-		var mayRemove = [];
-
-		for (var i = 0; i < styles.length; i++) {
-			var item = styles[i];
-			var domStyle = stylesInDom[item.id];
-
-			domStyle.refs--;
-			mayRemove.push(domStyle);
-		}
-
-		if(newList) {
-			var newStyles = listToStyles(newList, options);
-			addStylesToDom(newStyles, options);
-		}
-
-		for (var i = 0; i < mayRemove.length; i++) {
-			var domStyle = mayRemove[i];
-
-			if(domStyle.refs === 0) {
-				for (var j = 0; j < domStyle.parts.length; j++) domStyle.parts[j]();
-
-				delete stylesInDom[domStyle.id];
-			}
-		}
-	};
-};
-
-function addStylesToDom (styles, options) {
-	for (var i = 0; i < styles.length; i++) {
-		var item = styles[i];
-		var domStyle = stylesInDom[item.id];
-
-		if(domStyle) {
-			domStyle.refs++;
-
-			for(var j = 0; j < domStyle.parts.length; j++) {
-				domStyle.parts[j](item.parts[j]);
-			}
-
-			for(; j < item.parts.length; j++) {
-				domStyle.parts.push(addStyle(item.parts[j], options));
-			}
-		} else {
-			var parts = [];
-
-			for(var j = 0; j < item.parts.length; j++) {
-				parts.push(addStyle(item.parts[j], options));
-			}
-
-			stylesInDom[item.id] = {id: item.id, refs: 1, parts: parts};
-		}
-	}
-}
-
-function listToStyles (list, options) {
-	var styles = [];
-	var newStyles = {};
-
-	for (var i = 0; i < list.length; i++) {
-		var item = list[i];
-		var id = options.base ? item[0] + options.base : item[0];
-		var css = item[1];
-		var media = item[2];
-		var sourceMap = item[3];
-		var part = {css: css, media: media, sourceMap: sourceMap};
-
-		if(!newStyles[id]) styles.push(newStyles[id] = {id: id, parts: [part]});
-		else newStyles[id].parts.push(part);
-	}
-
-	return styles;
-}
-
-function insertStyleElement (options, style) {
-	var target = getElement(options.insertInto)
-
-	if (!target) {
-		throw new Error("Couldn't find a style target. This probably means that the value for the 'insertInto' parameter is invalid.");
-	}
-
-	var lastStyleElementInsertedAtTop = stylesInsertedAtTop[stylesInsertedAtTop.length - 1];
-
-	if (options.insertAt === "top") {
-		if (!lastStyleElementInsertedAtTop) {
-			target.insertBefore(style, target.firstChild);
-		} else if (lastStyleElementInsertedAtTop.nextSibling) {
-			target.insertBefore(style, lastStyleElementInsertedAtTop.nextSibling);
-		} else {
-			target.appendChild(style);
-		}
-		stylesInsertedAtTop.push(style);
-	} else if (options.insertAt === "bottom") {
-		target.appendChild(style);
-	} else if (typeof options.insertAt === "object" && options.insertAt.before) {
-		var nextSibling = getElement(options.insertInto + " " + options.insertAt.before);
-		target.insertBefore(style, nextSibling);
-	} else {
-		throw new Error("[Style Loader]\n\n Invalid value for parameter 'insertAt' ('options.insertAt') found.\n Must be 'top', 'bottom', or Object.\n (https://github.com/webpack-contrib/style-loader#insertat)\n");
-	}
-}
-
-function removeStyleElement (style) {
-	if (style.parentNode === null) return false;
-	style.parentNode.removeChild(style);
-
-	var idx = stylesInsertedAtTop.indexOf(style);
-	if(idx >= 0) {
-		stylesInsertedAtTop.splice(idx, 1);
-	}
-}
-
-function createStyleElement (options) {
-	var style = document.createElement("style");
-
-	options.attrs.type = "text/css";
-
-	addAttrs(style, options.attrs);
-	insertStyleElement(options, style);
-
-	return style;
-}
-
-function createLinkElement (options) {
-	var link = document.createElement("link");
-
-	options.attrs.type = "text/css";
-	options.attrs.rel = "stylesheet";
-
-	addAttrs(link, options.attrs);
-	insertStyleElement(options, link);
-
-	return link;
-}
-
-function addAttrs (el, attrs) {
-	Object.keys(attrs).forEach(function (key) {
-		el.setAttribute(key, attrs[key]);
-	});
-}
-
-function addStyle (obj, options) {
-	var style, update, remove, result;
-
-	// If a transform function was defined, run it on the css
-	if (options.transform && obj.css) {
-	    result = options.transform(obj.css);
-
-	    if (result) {
-	    	// If transform returns a value, use that instead of the original css.
-	    	// This allows running runtime transformations on the css.
-	    	obj.css = result;
-	    } else {
-	    	// If the transform function returns a falsy value, don't add this css.
-	    	// This allows conditional loading of css
-	    	return function() {
-	    		// noop
-	    	};
-	    }
-	}
-
-	if (options.singleton) {
-		var styleIndex = singletonCounter++;
-
-		style = singleton || (singleton = createStyleElement(options));
-
-		update = applyToSingletonTag.bind(null, style, styleIndex, false);
-		remove = applyToSingletonTag.bind(null, style, styleIndex, true);
-
-	} else if (
-		obj.sourceMap &&
-		typeof URL === "function" &&
-		typeof URL.createObjectURL === "function" &&
-		typeof URL.revokeObjectURL === "function" &&
-		typeof Blob === "function" &&
-		typeof btoa === "function"
-	) {
-		style = createLinkElement(options);
-		update = updateLink.bind(null, style, options);
-		remove = function () {
-			removeStyleElement(style);
-
-			if(style.href) URL.revokeObjectURL(style.href);
-		};
-	} else {
-		style = createStyleElement(options);
-		update = applyToTag.bind(null, style);
-		remove = function () {
-			removeStyleElement(style);
-		};
-	}
-
-	update(obj);
-
-	return function updateStyle (newObj) {
-		if (newObj) {
-			if (
-				newObj.css === obj.css &&
-				newObj.media === obj.media &&
-				newObj.sourceMap === obj.sourceMap
-			) {
-				return;
-			}
-
-			update(obj = newObj);
-		} else {
-			remove();
-		}
-	};
-}
-
-var replaceText = (function () {
-	var textStore = [];
-
-	return function (index, replacement) {
-		textStore[index] = replacement;
-
-		return textStore.filter(Boolean).join('\n');
-	};
-})();
-
-function applyToSingletonTag (style, index, remove, obj) {
-	var css = remove ? "" : obj.css;
-
-	if (style.styleSheet) {
-		style.styleSheet.cssText = replaceText(index, css);
-	} else {
-		var cssNode = document.createTextNode(css);
-		var childNodes = style.childNodes;
-
-		if (childNodes[index]) style.removeChild(childNodes[index]);
-
-		if (childNodes.length) {
-			style.insertBefore(cssNode, childNodes[index]);
-		} else {
-			style.appendChild(cssNode);
-		}
-	}
-}
-
-function applyToTag (style, obj) {
-	var css = obj.css;
-	var media = obj.media;
-
-	if(media) {
-		style.setAttribute("media", media)
-	}
-
-	if(style.styleSheet) {
-		style.styleSheet.cssText = css;
-	} else {
-		while(style.firstChild) {
-			style.removeChild(style.firstChild);
-		}
-
-		style.appendChild(document.createTextNode(css));
-	}
-}
-
-function updateLink (link, options, obj) {
-	var css = obj.css;
-	var sourceMap = obj.sourceMap;
-
-	/*
-		If convertToAbsoluteUrls isn't defined, but sourcemaps are enabled
-		and there is no publicPath defined then lets turn convertToAbsoluteUrls
-		on by default.  Otherwise default to the convertToAbsoluteUrls option
-		directly
-	*/
-	var autoFixUrls = options.convertToAbsoluteUrls === undefined && sourceMap;
-
-	if (options.convertToAbsoluteUrls || autoFixUrls) {
-		css = fixUrls(css);
-	}
-
-	if (sourceMap) {
-		// http://stackoverflow.com/a/26603875
-		css += "\n/*# sourceMappingURL=data:application/json;base64," + btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap)))) + " */";
-	}
-
-	var blob = new Blob([css], { type: "text/css" });
-
-	var oldSrc = link.href;
-
-	link.href = URL.createObjectURL(blob);
-
-	if(oldSrc) URL.revokeObjectURL(oldSrc);
-}
-
-
-/***/ }),
-/* 33 */
-/***/ (function(module, exports) {
-
-
-/**
- * When source maps are enabled, `style-loader` uses a link element with a data-uri to
- * embed the css on the page. This breaks all relative urls because now they are relative to a
- * bundle instead of the current page.
- *
- * One solution is to only use full urls, but that may be impossible.
- *
- * Instead, this function "fixes" the relative urls to be absolute according to the current page location.
- *
- * A rudimentary test suite is located at `test/fixUrls.js` and can be run via the `npm test` command.
- *
- */
-
-module.exports = function (css) {
-  // get current location
-  var location = typeof window !== "undefined" && window.location;
-
-  if (!location) {
-    throw new Error("fixUrls requires window.location");
-  }
-
-	// blank or null?
-	if (!css || typeof css !== "string") {
-	  return css;
-  }
-
-  var baseUrl = location.protocol + "//" + location.host;
-  var currentDir = baseUrl + location.pathname.replace(/\/[^\/]*$/, "/");
-
-	// convert each url(...)
-	/*
-	This regular expression is just a way to recursively match brackets within
-	a string.
-
-	 /url\s*\(  = Match on the word "url" with any whitespace after it and then a parens
-	   (  = Start a capturing group
-	     (?:  = Start a non-capturing group
-	         [^)(]  = Match anything that isn't a parentheses
-	         |  = OR
-	         \(  = Match a start parentheses
-	             (?:  = Start another non-capturing groups
-	                 [^)(]+  = Match anything that isn't a parentheses
-	                 |  = OR
-	                 \(  = Match a start parentheses
-	                     [^)(]*  = Match anything that isn't a parentheses
-	                 \)  = Match a end parentheses
-	             )  = End Group
-              *\) = Match anything and then a close parens
-          )  = Close non-capturing group
-          *  = Match anything
-       )  = Close capturing group
-	 \)  = Match a close parens
-
-	 /gi  = Get all matches, not the first.  Be case insensitive.
-	 */
-	var fixedCss = css.replace(/url\s*\(((?:[^)(]|\((?:[^)(]+|\([^)(]*\))*\))*)\)/gi, function(fullMatch, origUrl) {
-		// strip quotes (if they exist)
-		var unquotedOrigUrl = origUrl
-			.trim()
-			.replace(/^"(.*)"$/, function(o, $1){ return $1; })
-			.replace(/^'(.*)'$/, function(o, $1){ return $1; });
-
-		// already a full url? no change
-		if (/^(#|data:|http:\/\/|https:\/\/|file:\/\/\/)/i.test(unquotedOrigUrl)) {
-		  return fullMatch;
-		}
-
-		// convert the url to a full url
-		var newUrl;
-
-		if (unquotedOrigUrl.indexOf("//") === 0) {
-		  	//TODO: should we add protocol?
-			newUrl = unquotedOrigUrl;
-		} else if (unquotedOrigUrl.indexOf("/") === 0) {
-			// path should be relative to the base url
-			newUrl = baseUrl + unquotedOrigUrl; // already starts with '/'
-		} else {
-			// path should be relative to current directory
-			newUrl = currentDir + unquotedOrigUrl.replace(/^\.\//, ""); // Strip leading './'
-		}
-
-		// send back the fixed url(...)
-		return "url(" + JSON.stringify(newUrl) + ")";
-	});
-
-	// send back the fixed css
-	return fixedCss;
-};
-
-
-/***/ }),
-/* 34 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-/* WEBPACK VAR INJECTION */(function(module) {
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
-/*
-Copyright Conley Johnson 2018
-License:MIT
-
-interrupt and stop should be tested. It may hang the queue upon restart
-interrupt().add(...) may need kickstart
-
-*/
-if (module && module.exports) {
-  var ObjectAnimator = __webpack_require__(36).ObjectAnimator;
-}
-//import {ObjectAnimator} from 'animator'
-
-var clearResults = function clearResults() {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-  if (p.constructor === Array) {
-    p = { l: p };
-  }
-  var _p = p,
-      _p$l = _p.l,
-      l = _p$l === undefined ? [] : _p$l; //l stands for line as in queueLine, but any array fitting the queueLine format
-
-  l = arrayWrap(l);
-  var len = l.length;
-  for (var index = 0; index < len; index++) {
-    if (l[index].result !== undefined) {
-      delete l[index].result;
-    }
-    l[index].resolved = false;
-    l[index].initiated = false;
-    l[index].evaluation = null;
-  }
-  return l;
-};
-
-var arrayWrap = function arrayWrap(thing) {
-  if (Object.prototype.toString.call(thing) !== '[object Array]') {
-    return [thing];
-  } else {
-    return thing;
-  }
-};
-
-var format = function format(p) {
-  p = p ? p : function () {}; //if undefined, set with a function	
-  return clearResults(arrayWrap(p).map(function (val) {
-    if (val.constructor === Promise) {
-      val = Queue.promise(val);
-    }
-    if ((typeof val === 'undefined' ? 'undefined' : _typeof(val)) === 'object' && val.task && !val.preCondition && !val.postCondition && val.wait !== false) {
-      val.wait = true;
-    } //if a task is submitted in an object, without conditions and without wait, set wait to true. Otherwise, a function can be submitted raw
-    if (val.constructor === Queue) {
-      val = Queue.queue(val);
-    }
-    if (typeof val === 'function') {
-      val = { task: val };
-    }
-    var _val = val,
-        _val$task = _val.task,
-        task = _val$task === undefined ? function () {} : _val$task,
-        _val$preCondition = _val.preCondition,
-        preCondition = _val$preCondition === undefined ? function () {
-      return true;
-    } : _val$preCondition,
-        _val$postCondition = _val.postCondition,
-        postCondition = _val$postCondition === undefined ? function () {
-      return true;
-    } : _val$postCondition,
-        _val$wait = _val.wait,
-        wait = _val$wait === undefined ? false : _val$wait,
-        _val$name = _val.name,
-        name = _val$name === undefined ? undefined : _val$name,
-        _val$comment = _val.comment,
-        comment = _val$comment === undefined ? '' : _val$comment,
-        _val$sec = _val.sec,
-        sec = _val$sec === undefined ? 3600 : _val$sec,
-        _val$timeout = _val.timeout,
-        timeout = _val$timeout === undefined ? function () {} : _val$timeout,
-        _val$earlyTermination = _val.earlyTermination,
-        earlyTermination = _val$earlyTermination === undefined ? function () {} : _val$earlyTermination,
-        _val$getValue = _val.getValue,
-        getValue = _val$getValue === undefined ? false : _val$getValue,
-        _val$getValueFromTask = _val.getValueFromTask,
-        getValueFromTask = _val$getValueFromTask === undefined ? false : _val$getValueFromTask,
-        _val$queue = _val.queue,
-        queue = _val$queue === undefined ? false : _val$queue;
-
-    return { task: task, preCondition: preCondition, postCondition: postCondition, wait: wait, name: name, comment: task.toString(), sec: sec, timeout: timeout, earlyTermination: earlyTermination, getValue: getValue, getValueFromTask: getValueFromTask, initiated: false, resolved: false, queue: queue, subscriptions: new Map(), evaluation: null
-      //wait means, wait for a restart from the task. getvalue is an override function for retrieving the value to store after the promise is done. if not set, the argument provided by done is used
-    };
-  }));
-};
-
-//formfunctions
-function formToObject(form) {
-  var obj = {};
-  var elemarray;
-  if (typeof form === 'string' || typeof form === 'number') {
-    elemArray = document.getElementById(form).elements;
-  } else {
-    elemarray = form.elements;
-  }
-  var elemlen = elemarray.length;
-  var checknum; //for trying to convert strings to numbers
-  for (var i = 0; i < elemlen; i++) {
-    var n = elemarray[i].name.replace(/\[\]/g, '');
-    if (n == '') {
-      n = elemarray[i].id;
-    }
-    obj[n] = elemarray[i].value;
-    checknum = Number(obj[n]);if (!isNaN(checknum)) {
-      obj[n] = checknum;
-    }
-    if (elemarray[i].type == 'checkbox') {
-      obj[n] = elemarray[i].checked;
-    }
-    if (elemarray[i].type == 'select-multiple') {
-      obj[n] = getMultipleSelectValues(elemarray[i]);
-    }
-  }
-  return obj;
-}
-
-function getMultipleSelectValues(select) {
-  var result = [];
-  var options = select && select.options;
-  var opt;
-  for (var i = 0, iLen = options.length; i < iLen; i++) {
-    opt = options[i];
-    if (opt.selected) {
-      result.push(opt.value || opt.text);
-    }
-  }
-  result = result.map(cSTFV);
-  return result;
-}
-
-function cSTFV(val) {
-  //convert strings to functional values
-  if (val === 'true') {
-    return true;
-  }
-  if (val === 'false') {
-    return false;
-  }
-  var v = Number(val);
-  if (!isNaN(val)) {
-    return v;
-  } else {
-    return val;
-  }
-}
-//end form functions
-
-function Queue() {
-  var _this = this;
-
-  var queueLine = []; //where the tasks and conditions are stored
-  var queueMap = new Map(); //taskobj->name,index
-  //queueMap is for quick searches
-  var queueIndex = 0; //iteratorguide for the queue
-  var queueLength = 0; //number of tasks queued up
-  var queueHandle = false; //the handle for the timeouts
-  var timeoutHandle = false; //each 
-  var checkSpeed = 175; //interval for conditional checks
-  var checksRunning = false,
-      waitRunning = false;
-  var terminated = false; //stopped callback has been called, and it is locked, unless explicitly opened by calling a modifier (like add, or splice) or calling start({unterminate:true})
-  var callBack = function callBack() {};
-  var initialValue = undefined;
-  var subscriptions = new Map();
-  var repeat = false;
-
-  this.running = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    if (p.detail) {
-      return { checksRunning: checksRunning, waitRunning: waitRunning };
-    };return checksRunning || waitRunning;
-  };
-
-  this.setCheckSpeed = function (speed) {
-    checkSpeed = speed;return _this;
-  };
-
-  this.finally = function (cb) {
-    callBack = cb;
-    if (!more() && queueLength > 0 && queueLine[queueIndex].resolved) {
-      cb(_this.status(true));
-    };
-    return _this;
-  };
-
-  this.initVal = function (v) {
-    initialValue = v;
-  };
-
-  this.status = function () {
-    var control = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
-
-    return {
-      currentTask: queueLine[queueIndex],
-      queueLength: queueLength,
-      queueIndex: queueIndex,
-      waitRunning: waitRunning,
-      checksRunning: checksRunning,
-      queueLine: queueLine.slice(),
-      control: control ? this : null
-    };
-  };
-
-  this.currentVal = function () {
-    return queueLength > 0 && queueLine[queueIndex] ? queueLine[queueIndex].result : initialValue;
-  };
-
-  this.lastVal = function () {
-    return queueLength > 0 && queueLine[queueLength - 1] ? queueLine[queueLength - 1].result : initialValue;
-  };
-
-  this.add = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var insert = arguments[1];
-    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
-    var actions = this.format(p);
-    if (!insert) {
-      queueLine.push.apply(queueLine, actions);
-    } else {
-      queueLine.splice.apply(queueLine, [queueIndex + 1, 0].concat(_toConsumableArray(actions)));
-    }
-    bookKeep();
-    return this;
-  };
-
-  this.insert = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
-    this.add(p, true);
-  };
-
-  this.repeat = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    repeat = true;
-  };
-
-  this.clear = function () {
-    this.stop({ clear: true });queueIndex = 0;queueLine.length = 0;bookKeep();return this;
-  };
-
-  this.stop = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    //wait bool, clear bool, terminate bool
-    clearTimeout(queueHandle);
-    checksRunning = false;waitRunning = false;
-    if (p.wait && !p.clear) {
-      waitRunning = true;
-    } else {
-      clearTimeout(timeoutHandle);
-    }
-    if (p.terminate) {
-      terminated = true;clearTimeout(timeoutHandle);
-      callBack(this.status(true));
-      this.publish();
-    }
-    return this;
-  };
-
-  this.kickStart = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    if (_this.running()) {
-      return;
-    }
-    _this.start();
-    return _this;
-  };
-
-  this.start = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    if (terminated && !p.unterminate) {/*console.error('this queue has been terminated. to restart, restart({unterminate:true}) queue.js start()')*/} else {
-      terminated = false;
-    }
-    if (p.indexMatch) {
-      if (p.indexMatch !== queueIndex) {
-        /*console.log('tried to restart:'+p.indexMatch+'. current index:'+queueIndex);*/return _this;
-      }
-    }
-    if (p.initialValue !== undefined) {
-      initialValue = p.initialValue;
-    } //only matters when starting from 0
-    if (p.callBack) {
-      _this.finally(p.callBack);
-    }
-    clearTimeout(queueHandle);clearTimeout(timeoutHandle);listen();
-    return _this;
-  };
-
-  var listen = function listen() {
-    checksRunning = true;waitRunning = true;
-    var q = queueLine[queueIndex];
-    if (!q.initiated) {
-      if (q.preCondition()) {
-        var result = q.task(getControlPackage());
-        if (result instanceof Promise) {
-          _this.insert(result);
-        } //should route through Queue.promise, where then->(result)=>p.done(result) will be attached
-        if (!q.wait) {
-          q.result = result;
-        }
-        q.initiated = true;
-      }
-      if (q.wait) {
-        _this.stop({ wait: true });return; //advance will be triggered at the end of the task. generally postCondition return true, but thats up to the developer
-      }
-    }
-    if (q.initiated) {
-      if (q.postCondition()) {
-        if (q.getValue) {
-          q.result = q.getValue(getControlPackage({ includeDone: false }));
-        };q.resolved = true;_this.moveOn();return;
-      }
-    }
-    queueHandle = setTimeout(function () {
-      listen();
-    }, checkSpeed);
-  };
-
-  var getControlPackage = function getControlPackage() {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var _p$includeDone = p.includeDone,
-        includeDone = _p$includeDone === undefined ? true : _p$includeDone;
-
-    var ret = {
-      control: _this,
-      done: function (indexMatch, result) {
-        var _this2 = this;
-
-        if (queueLine[indexMatch] === undefined) {
-          /*console.log('index '+indexMatch+' no longer exists in queue. queue.js listen()');*/return;
-        }
-        queueLine[indexMatch].result = result;
-        if (!waitRunning) {
-          return;
-        }
-        setTimeout(function () {
-          _this2.start({ indexMatch: indexMatch });
-        }, 0); //set timeout is to take it out of the call stack
-      }.bind(_this, queueIndex),
-      result: getPreviousResult(),
-      evaluate: function (task, val) {
-        task.evaluation = val;
-      }.bind(_this, queueLine[queueIndex])
-    };
-    if (!includeDone) {
-      delete ret.done;
-    }
-    return ret;
-  };
-
-  var finished = function finished() {
-    return queueIndex >= queueLength - 1 && terminated;
-  };
-
-  var more = function more() {
-    return queueLine[queueIndex + 1];
-  };
-
-  this.moveOn = function () {
-    //move to the next step if it exists. if not, terminate/ should be the only way to advance
-    _this.publishTask({ task: queueLine[queueIndex] });
-    if (!more() && !repeat) {
-      _this.stop({ terminate: true });return false;
-    }
-    if (!repeat) {
-      queueIndex++;
-    } else {
-      clearResults([queueLine[queueIndex]]);
-    }
-    repeat = false;
-    _this.start();
-    startTimeout();
-    return true;
-  };
-
-  var startTimeout = function startTimeout() {
-    clearTimeout(timeoutHandle);
-    timeoutHandle = setTimeout(function () {
-      queueLine[queueIndex].timeout(getControlPackage({ includeDone: false }));
-      _this.moveOn(); //going to have to make this explicitly the devs responsibility or take this control off the table. 
-    }, queueLine[queueIndex].sec * 1000);
-  };
-  var getPreviousResult = function getPreviousResult() {
-    if (queueLine[queueIndex].getValueFromTask) {
-      var look = queueLine[queueIndex].getValueFromTask;
-      if (typeof look === 'string') {
-        for (var _m = 0; _m < queueLength; _m++) {
-          if (queueLine[_m].name === look) {
-            return queueLine[_m].result;
-          }
-        }
-      } else if (typeof look === 'number' && Math.abs(look) >= m) {
-        return queueLine[queueIndex - Math.abs(look)].result;
-      }
-    }
-    return queueIndex > 0 ? queueLine[queueIndex - 1].result : initialValue;
-  };
-
-  this.change = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    queueLine.splice(queueIndex + 1);
-    return _this.add(p); //add will bookkeep
-  };
-
-  this.interrupt = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    //only performs the earlyTermination func..you have to then stop or moveon
-    var and = p.and;
-
-    if (queueLine[queueIndex]) {
-      queueLine[queueIndex].earlyTermination(getControlPackage({ includeDone: false }));
-    }
-    if (and === 'stop') {
-      _this.stop();
-    } else {
-      _this.moveOn();
-    }
-    return _this;
-  };
-
-  this.splice = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    //splices queueLine, but uses search  to find the indexes
-    var _p$replacement = p.replacement,
-        replacement = _p$replacement === undefined ? [] : _p$replacement;
-
-    var _getIndexes = getIndexes(p),
-        from = _getIndexes.from,
-        to = _getIndexes.to; //{action, index}
-
-
-    if (from.index < queueIndex + 1) {
-      console.log('from index' + from.index + ' includes past/current tasks in the queue. setting from index to very next task index.');
-    }
-    from.index = queueIndex + 1;
-    if (from.index > to.index) {
-      console.error('indexes off->queue.js->splice()', { from: from, to: to });
-    } else {
-      var remove = to.index - from.index + 1; //plus 1 is to make it inclusive of the last element
-      queueLine.splice.apply(queueLine, [from.index, remove].concat(_this.format(replacement)));
-      bookKeep();
-    }
-    return _this;
-  };
-
-  this.delete = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    var found = this.find(p);
-    if (found.index < queueIndex + 1) {
-      console.error('task is past or current. Cannot be deleted');return this;
-    }
-    if (found) {
-      queueLine.splice(found.index, 1);bookKeep();
-    }
-    return this;
-  };
-
-  this.pop = function () {
-    if (queueIndex === queueLength - 1) {
-      console.error('tried to pop last task, which has already been initiated queue.js->pop');return _this;
-    }
-    queueLine.pop();bookKeep();return _this;
-  };
-
-  this.slice = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    //returns a new array with new shallow action object clones. setting their properties will not alter the action objects they were cloned from
-    //however,performing methods on the sliced action objects will operate on the originals
-    //and in fact some of the functions submitted will operate on important closure variables
-    var _ref = p.from || p.to ? getIndexes(p) : { from: { index: 0 } //if none submitted, splice the whole queueline 
-    },
-        from = _ref.from,
-        to = _ref.to;
-
-    if (to && from.index > to.index || !from) {
-      console.error('indexes off->queue.js->get()', { from: from, to: to });return [];
-    } else {
-      //
-      var args = to ? [from.index, to.index] : [from.index];
-      if (args.indexOf(undefined) !== -1) {
-        console.error(new Error('unable to find criteria'), from, to);return [];
-      }
-      var ret = clearResults(queueLine.slice.apply(queueLine, args).map(function (val) {
-        return Object.assign({}, val);
-      }));
-      ret.forEach(function (val) {
-        var newMap = new Map();
-        val.subscriptions.forEach(function (v, k) {
-          newMap.set(k, v);
-        });
-        val.subscriptions = newMap;
-      });
-      return ret;
-    }
-  };
-
-  var getIndexes = function getIndexes() {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    return { from: _this.find(p.from), to: _this.find(p.to) };
-  };
-
-  this.find = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    return queueMap.get(p.name || p.index || p.taskObj || p.task);
-    //you could actually extend this to search by any criteria in the queueline
-  };
-
-  var bookKeep = function bookKeep() {
-    //stores keys by name, index,task[the function to execute], action[the action package submitted] 
-    //tears map down and rebuilds because queueLine indexes shift
-    //modifying the queueLine calls bookKeep. renders containing loops order 5*A*N where A is the number of outer iterations and N is the number of tasks in the queue 
-    queueMap.clear();queueLength = queueLine.length;
-    for (var index = 0; index < queueLength; index++) {
-      var action = queueLine[index];
-      var pack = { action: action, index: index },
-          task = action.task,
-          name = action.name; //take out the name and task for setting in map
-      if (_this.find({ name: name })) {
-        console.error('duplicate names queue.js bookKeep', name, index);
-      }
-      if (_this.find({ taskObj: pack })) {
-        console.error('duplicate taskObjects. second dup. will be skipped. queue.js bookKeep', name, index);
-      }
-      if (_this.find({ task: task })) {
-        console.error('duplicate tasks, only the last inserted can be returned through find queue.js bookKeep', name, index);
-      }
-      if (name !== undefined) {
-        queueMap.set(name, pack);
-      }
-      queueMap.set(index, pack);
-      queueMap.set(action, pack); //duplicate packs??
-      queueMap.set(task, pack); //duplicate functions should be allowed.
-    }
-    if (!_this.allDone()) {
-      terminated = false;
-    }
-  };
-
-  this.clearResults = function () {
-    clearResults(queueLine);return _this;
-  };
-
-  this.reset = function () {
-    queueIndex = 0;_this.clearResults();return _this;
-  };
-
-  this.format = function (p) {
-    return format(p);
-  };
-
-  this.allDone = function () {
-    return queueLine.every(function (val) {
-      val.resolved;
-    });
-  };
-
-  this.subscribe = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var cb = p.cb;
-
-    if (typeof p === 'function') {
-      cb = p;
-    }
-    if (!cb) {
-      console.error('queue.js subscribe(func||{cb:func})->no function');
-    }
-    subscriptions.set(cb, 1);
-    return _this;
-  };
-
-  this.unsubscribe = function (p) {
-    var cb = p.cb;
-
-    if (typeof p === 'function') {
-      cb = p;
-    }
-    subscriptions.delete(cb);
-    return _this;
-  };
-
-  this.publish = function () {
-    var _this3 = this;
-
-    //publishes that the entire queue is finished
-    subscriptions.forEach(function (v, k) {
-      k(_this3.status());
-    });
-    subscriptions.clear();
-  };
-
-  this.subscribeTask = function (p) {
-    var name = p.name,
-        index = p.index,
-        cb = p.cb;
-
-    if (!cb) {
-      console.error('queue.js subscribeTask({name||index,cb})->no function to attach:', p);return _this;
-    }
-    var task = _this.find(p);
-    if (!task) {
-      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
-    }
-    if (task.resolved) {
-      cb(task);return _this;
-    }
-    task.subscriptions.set(cb, 1);
-    return _this;
-  };
-
-  this.unsubscribeTask = function (p) {
-    var name = p.name,
-        index = p.index,
-        cb = p.cb,
-        _p$check = p.check,
-        check = _p$check === undefined ? false : _p$check;
-
-    if (!cb) {
-      console.error('queue.js subscribeTask({name||index,cb})->no function to unattach:', p);return _this;
-    }
-    var task = _this.find(p);
-    if (!task) {
-      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
-    }
-    if (check) {
-      console.log('task', task, 'has callback' + cb.toString(), task.subscriptions.has(cb));
-    }
-    task.subscriptions.delete(cb, 1);
-    return _this;
-  };
-
-  this.publishTask = function () {
-    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var task = p.task;
-    if (!task) {
-      return this;
-    }
-    var subscriptions = task.subscriptions;
-    subscriptions.forEach(function (v, k) {
-      k(task);
-    });
-    subscriptions.clear();
-    return this;
-  };
-
-  this.all = function (p) {
-    _this.add(Queue.all(p));return _this;
-  };
-  this.insertAll = function (p) {
-    _this.insert(Queue.all(p));return _this;
-  };
-
-  this.race = function (p) {
-    _this.add(Queue.race(p));return _this;
-  };
-  this.insertRace = function (p) {
-    _this.insert(Queue.race(p));return _this;
-  };
-
-  this.wait = function (p) {
-    _this.add(Queue.wait(p));return _this;
-  };
-  this.insertWait = function (p) {
-    _this.insert(Queue.wait(p));return _this;
-  };
-
-  this.animate = function (p) {
-    _this.add(Queue.animate(p));return _this;
-  };
-  this.insertAnimate = function (p) {
-    _this.insert(Queue.animate(p));return _this;
-  };
-
-  this.transition = function (p) {
-    _this.add(Queue.transition(p));return _this;
-  };
-  this.insertTransition = function (p) {
-    _this.insert(Queue.transition(p));return _this;
-  };
-
-  this.blink = function (p) {
-    _this.add(Queue.blink(p));return _this;
-  };
-  this.insertBlink = function (p) {
-    _this.insert(Queue.blink(p));return _this;
-  };
-
-  this.listen = function (p) {
-    _this.add(Queue.listen(p));return _this;
-  };
-  this.insertListen = function (p) {
-    _this.insert(Queue.listen(p));return _this;
-  };
-
-  this.listenTask = function (p) {
-    _this.add(Queue.listenTask(p));return _this;
-  };
-  this.insertListenTask = function (p) {
-    _this.insert(Queue.listenTask(p));return _this;
-  };
-
-  this.ajax = function (p) {
-    _this.add(Queue.ajax(p));return _this;
-  };
-  this.insertAjax = function (p) {
-    _this.insert(Queue.ajax(p));return _this;
-  };
-
-  this.fetch = function (p) {
-    _this.add(Queue.fetch(p));return _this;
-  };
-  this.insertFetch = function (p) {
-    _this.insert(Queue.fetch(p));return _this;
-  };
-
-  this.loadIFrame = function (p) {
-    _this.add(Queue.loadIFrame(p));return _this;
-  };
-  this.insertLoadIFrame = function (p) {
-    _this.insert(Queue.loadIFrame(p));return _this;
-  };
-}
-
-Queue.wait = function (time) {
-  //time in ms
-  if ((typeof time === 'undefined' ? 'undefined' : _typeof(time)) === 'object' && time.from && time.to) {
-    var time = Math.random() * (time.to - time.from);
-  }
-  var task = function task(p) {
-    setTimeout(function () {
-      p.done(p.result);
-    }, time);
-  }; //pass previous result through					 
-  return { task: task };
-};
-
-Queue.queue = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //starts another Queue instance and hooks up the call back 
-  var queue = p.queue;
-
-  if (p.constructor === Queue) {
-    queue = p;
-  }
-  var task = function task(p) {
-    queue.clearResults().reset().finally(p.done).kickStart();
-  };
-  return Object.assign({ task: task, wait: true, queue: queue }, p);
-};
-
-Queue.promiseWrap = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //creates a promise, hooks this queue up to that promise (through finally) and returns the promise
-  var toDo = p.toDo; //async function, queue, promise
-
-  if (!toDo || !toDo.constructor) {
-    console.log('wrong argument in promiseWrap queue.js argument submitted:', p);return;
-  }
-  var resolve = function resolve(res) {
-    if (toDo.constructor === Queue) {
-      this.finally(res);
-    }
-    /*
-    tasks need a queue to activate them.
-    you might wrap an asynchronous function in a promise
-      hmm, queue should take asynchronous functions...
-    and other another promise?
-    */
-  };
-  return new Promise(resolve);
-};
-
-Queue.promise = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //wraps a queue in a task which does then->p.done 
-  var promise = p.promise;
-
-  if (p instanceof Promise) {
-    promise = p;
-  }
-  var task = function task(par) {
-    //executed when reached in the queue. 
-    promise.then(function (result) {
-      par.done(result);
-    }, function (result) {
-      par.done(result);
-    });
-  };
-  return Object.assign({ task: task, promise: promise, wait: true }, p);
-};
-
-Queue.fetch = function () {
-  var pack = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //must include 'fetchPackage' parameter  or p will be interpreted as the fetchPackage
-  if (!pack.fetchPackage) {
-    pack = { fetchPackage: pack };
-  } //use the package if it doesn't contain designated package for the fetch function
-
-  pack.task = function (p) {
-    var prom = fetch(pack.fetchPackage);
-    return prom;
-  }; //Queue promise will extract the promise result and pass it down the queue
-  pack.wait = false;
-  return pack;
-};
-Queue.ajax = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var _p$url = p.url,
-      url = _p$url === undefined ? '' : _p$url,
-      _p$data = p.data,
-      data = _p$data === undefined ? {} : _p$data,
-      _p$synch = p.synch,
-      synch = _p$synch === undefined ? true : _p$synch,
-      _p$method = p.method,
-      method = _p$method === undefined ? 'POST' : _p$method;
-
-  var xhr = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
-  var task = function task() {
-    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    var params;
-    if (data.nodeName && data.nodeName.toLowerCase() === 'form') {
-      if (data.action) {
-        url = data.action;
-      };
-      params = formToObject(data);
-    }
-    params = typeof data == 'string' ? data : Object.keys(data).map(function (k) {
-      return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]);
-    }).join('&');
-
-    xhr.addEventListener('readystatechange', function () {
-      console.log(xhr.status);
-    });
-    xhr.addEventListener('load', function () {
-      par.done({ response: xhr.responseText, status: xhr.status });
-    });
-    xhr.open(method, url, synch);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-    xhr.send(params);
-  };
-  return Object.assign({ task: task, wait: true, xhr: xhr }, p);
-};
-
-Queue.loadIFrame = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var url = p.url,
-      IFrame = p.IFrame,
-      src = p.src;
-
-  if (!url) {
-    url = src;
-  }
-  var task = function task() {
-    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    IFrame.addEventListener('load', function () {
-      par.done(IFrame);
-    });
-    IFrame.src = url;
-  };
-  return Object.assign({ task: task }, p);
-};
-
-Queue.listen = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var queue = p.queue,
-      _p$start = p.start,
-      start = _p$start === undefined ? false : _p$start;
-
-  if (p.constructor === Queue) {
-    queue = p;
-  }
-  var task = function task(p) {
-    if (queue.allDone()) {
-      p.done();return;
-    }
-    queue.subscribe({ cb: p.done });
-    if (start) {
-      queue.kickStart();
-    }
-  };
-  return Object.assign({ task: task, wait: true }, p);
-};
-
-Queue.listenTask = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var _p$queue = p.queue,
-      queue = _p$queue === undefined ? new Queue() : _p$queue,
-      _p$name = p.name,
-      name = _p$name === undefined ? 'null12345' : _p$name,
-      index = p.index,
-      _p$start2 = p.start,
-      start = _p$start2 === undefined ? false : _p$start2;
-
-  var task = function task(p) {
-    var t = queue.find({ name: name, index: index });
-    if (!t) {
-      console.error('queue.js Queue.listenTask({queue,name,index,start}) task not found for listening');
-    }
-    if (t && t.resolved) {
-      p.done(t.result);return;
-    }
-    queue.subscribeTask({ name: name, index: index, cb: p.done });
-    if (start) {
-      queue.kickStart();
-    }
-  };
-  return Object.assign({ task: task, wait: true }, p);
-};
-
-Queue.race = function (p) {
-  return Queue.all(p, true);
-};
-
-Queue.all = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var race = arguments[1];
-
-  var stalls = [];
-  var queue,
-      useP = p.constructor === Array; //is p the raw data or part of a package
-  var actions = (useP ? p : p.actions).map(function (val) {
-    return format(val);
-  });
-  if (actions.length === 0) {
-    return {};
-  }
-  var doneHolder = { done: function done() {} //place holder for the allTask resolution function
-  };var check = function check() {
-    return stalls.every(function (val) {
-      return val.resolved;
-    });
-  };
-  var retrieve = function retrieve(i, result) {
-    //result is a status() request submitted by the finally call after each stall queue finishes. So an allTask returns an array of all the final status requests of all it's tasks.
-    stalls[i].result = result;
-    stalls[i].resolved = true;
-    if (race) {
-      doneHolder.done(result);check = function check() {
-        return false;
-      };
-    }
-    if (check()) {
-      doneHolder.done(stalls.map(function (val) {
-        return val.result;
-      }));
-    }
-  };
-  actions.forEach(function (val, i) {
-    queue = new Queue().add(val).finally(retrieve.bind(null, i)); //queues should call back with the status report
-    stalls[i] = { queue: queue, result: undefined, resolved: false };
-  });
-  var earlyTermination = function earlyTermination() {
-    stalls.forEach(function (val) {
-      if (val.queue) {
-        val.queue.interrupt({ and: 'stop' });
-      }
-    });
-  };
-  var task = function task(p) {
-    doneHolder.done = p.done;
-    stalls.forEach(function (val) {
-      val.queue.start();
-    });
-  };
-  return Object.assign({ task: task, earlyTermination: earlyTermination }, useP ? {} : p);
-};
-
-Queue.transition = function () {
-  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var node = par.node,
-      style = par.style,
-      _par$duration = par.duration,
-      duration = _par$duration === undefined ? 1 : _par$duration,
-      _par$timing = par.timing,
-      timing = _par$timing === undefined ? 'ease-in-out' : _par$timing,
-      _par$synch = par.synch,
-      synch = _par$synch === undefined ? true : _par$synch,
-      _par$contours = par.contours,
-      contours = _par$contours === undefined ? {} : _par$contours;
-
-  var task = function task(p) {
-    //hook up the function
-    var evFunc = function evFunc() {
-      node.removeEventListener('transitionend', evFunc);
-      p.done();
-    };
-    node.addEventListener('transitionend', evFunc);
-    //set the transition
-    if (synch && style.transform) {
-      var _Queue$synchTransform = Queue.synchTransform({ orig: node.style.transform, dest: style.transform }),
-          dest = _Queue$synchTransform.dest;
-
-      style.transform = dest;
-    }
-    var transProps = [];
-    for (var k in style) {
-      transProps.push(k + ' ' + duration + 's ' + timing);
-    }
-    Object.assign(node.style, { transition: transProps.join(', ') }, style);
-    //set the style
-  };
-  return Object.assign({ task: task, wait: true }, par);
-};
-
-Queue.animate = function () {
-  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-  if (!ObjectAnimator) {
-    console.error('You need the animator dependency to use this method.');return function () {};
-  }
-  var animation = new ObjectAnimator(); //if the conductor is on the window, it will be used. otherwise, either the animator will run on it's own, or a dev will need to store a conductor somewhere then use " var animation=new ObjectAnimator({conductor})"
-  var task = function task(p) {
-    par.postAnim = function () {
-      p.done();
-    };
-    animation.loadAnimation(par).animate();
-  };
-  return Object.assign({ task: task, wait: true, earlyTermination: function earlyTermination() {
-      animation.stop();
-    }, animation: animation }, par);
-};
-
-Queue.blink = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var node = p.node,
-      _p$repeat = p.repeat,
-      repeat = _p$repeat === undefined ? 1 : _p$repeat,
-      _p$interval = p.interval,
-      interval = _p$interval === undefined ? 500 : _p$interval,
-      _p$proportion = p.proportion,
-      proportion = _p$proportion === undefined ? .5 : _p$proportion;
-
-  var tasks = [];
-  for (var i = 0; i < repeat; i++) {
-    tasks.push(function () {
-      node.style.opacity = 0;
-    }, Queue.wait(interval * (1 - proportion)), function () {
-      node.style.opacity = 1;
-    }, Queue.wait(interval * proportion));
-  }
-  tasks.pop(); //no need to wait after the last blink
-  return tasks;
-};
-
-Queue.synchTransform = function () {
-  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //orig and dest should be strings
-  var orig = p.orig,
-      dest = p.dest,
-      origArray = [],
-      destArray = [],
-      origU = new Map(),
-      destU = new Map(),
-      origVal;
-
-  var breakOrig = orig.match(/[a-zA-Z]+\([^\)]*\)/g),
-      breakDest = dest.match(/[a-zA-Z]+\([^\)]*\)/g);
-  if (breakOrig) {
-    breakOrig.forEach(function (val, i) {
-      val = val.replace(/\s/g, '');origU.set(val.split('(')[0], val);
-    });
-  } else {
-    breakOrig = [];
-  }
-  if (breakDest) {
-    breakDest.forEach(function (val, i) {
-      val = val.replace(/\s/g, '');destU.set(val.split('(')[0], val);
-    });
-  } else {
-    breakDest = [];
-  }
-  origU.forEach(function (v, k) {
-    destArray.push(destU.has(k) ? destU.get(k) : origU.get(k));
-    origArray.push(origU.get(k));
-    destU.delete(k);
-  });
-  destU.forEach(function (v, k) {
-    destArray.push(destU.get(k));
-    origArray.push(origU.has(k) ? origU.get(k) : transformDefaultTable[k]);
-  });
-  return { orig: origArray.join(' '), dest: destArray.join(' ') };
-};
-
-//if(window.wait===undefined){window.wait=Queue.wait}
-//if(window.animate===undefined){window.animate=Queue.animate}
-//if(window.transition===undefined){window.transition=Queue.transition}
-
-var transformDefaultTable = {
-  //matrices and perspective must be set already to animate
-  translate: 'translate(0,0)',
-  translate3d: 'translate3d(0,0,0)',
-  translateX: 'translateX(0)',
-  translateY: 'translateY(0)',
-  translateZ: 'translateZ(0)',
-  scale: 'scale(1,1)',
-  scale3d: 'scale3d(1,1,1)',
-  scaleX: 'scaleX(1)',
-  scaleY: 'scaleY(1)',
-  scaleZ: 'scaleZ(1)',
-  rotate: 'rotate(0deg)',
-  rotate3d: 'rotate3d(0,0,0,0deg)',
-  rotateX: 'rotateX(0deg)',
-  rotateY: 'rotateY(0deg)',
-  rotateZ: 'rotateZ(0deg)',
-  skew: 'skew(0deg,0deg)',
-  skewX: 'skewX(0deg)',
-  skewY: 'skewY(0deg)'
-};
-exports.Queue = Queue;
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(35)(module)))
-
-/***/ }),
-/* 35 */
 /***/ (function(module, exports) {
 
 module.exports = function(module) {
@@ -22583,7 +21912,7 @@ module.exports = function(module) {
 
 
 /***/ }),
-/* 36 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -23164,7 +22493,7 @@ var rgbaString = function rgbaString(rgba) {
 exports.ObjectAnimator = ObjectAnimator;
 
 /***/ }),
-/* 37 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -23181,7 +22510,7 @@ var _react = __webpack_require__(1);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _queue = __webpack_require__(34);
+var _queue = __webpack_require__(12);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -23211,12 +22540,741 @@ var SimpleDropdown = exports.SimpleDropdown = function (_Component) {
                     'suggestions'
                 );
             }
-            return this.render();
+            return this.props.render.call(this);
         }
     }]);
 
     return SimpleDropdown;
 }(_react.Component);
+
+/***/ }),
+/* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+var constants = exports.constants = {
+    host: 'https://www.googleapis.com/books/v1/volumes'
+};
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.SearchResults = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(1);
+
+var _react2 = _interopRequireDefault(_react);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var SearchResults = exports.SearchResults = function (_Component) {
+    _inherits(SearchResults, _Component);
+
+    function SearchResults(props) {
+        _classCallCheck(this, SearchResults);
+
+        return _possibleConstructorReturn(this, (SearchResults.__proto__ || Object.getPrototypeOf(SearchResults)).call(this, props));
+    }
+
+    _createClass(SearchResults, [{
+        key: 'render',
+        value: function render() {
+            var _this2 = this;
+
+            console.log({ props: this.props });
+            var data = this.props.data || [];
+            var formatItem = function formatItem(v) {
+                var volume = v.volumeInfo;
+                return _react2.default.createElement(
+                    'div',
+                    null,
+                    _react2.default.createElement(
+                        'div',
+                        null,
+                        volume.title
+                    ),
+                    _react2.default.createElement(
+                        'div',
+                        null,
+                        volume.authors.join(', ')
+                    ),
+                    _react2.default.createElement(
+                        'div',
+                        { onClick: _this2.props.showDetails || function () {} },
+                        'More Info'
+                    )
+                );
+            };
+            //console.log({data:data.map(formatItem)})
+            return data.map(formatItem);
+        }
+    }]);
+
+    return SearchResults;
+}(_react.Component);
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.SearchContainer = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(1);
+
+var _react2 = _interopRequireDefault(_react);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var SearchContainer = exports.SearchContainer = function (_Component) {
+    _inherits(SearchContainer, _Component);
+
+    function SearchContainer(props) {
+        _classCallCheck(this, SearchContainer);
+
+        return _possibleConstructorReturn(this, (SearchContainer.__proto__ || Object.getPrototypeOf(SearchContainer)).call(this, props));
+    }
+
+    _createClass(SearchContainer, [{
+        key: 'render',
+        value: function render() {
+            return _react2.default.createElement(
+                'div',
+                null,
+                this.props.children
+            );
+        }
+    }]);
+
+    return SearchContainer;
+}(_react.Component);
+
+/***/ }),
+/* 34 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// style-loader: Adds some css to the DOM by adding a <style> tag
+
+// load the styles
+var content = __webpack_require__(35);
+if(typeof content === 'string') content = [[module.i, content, '']];
+// Prepare cssTransformation
+var transform;
+
+var options = {"hmr":true}
+options.transform = transform
+// add the styles to the DOM
+var update = __webpack_require__(37)(content, options);
+if(content.locals) module.exports = content.locals;
+// Hot Module Replacement
+if(false) {
+	// When the styles change, update the <style> tags
+	if(!content.locals) {
+		module.hot.accept("!!../../../../../node_modules/css-loader/index.js!../../../../../node_modules/postcss-loader/lib/index.js!../../node_modules/sass-loader/lib/loader.js!./style.scss", function() {
+			var newContent = require("!!../../../../../node_modules/css-loader/index.js!../../../../../node_modules/postcss-loader/lib/index.js!../../node_modules/sass-loader/lib/loader.js!./style.scss");
+			if(typeof newContent === 'string') newContent = [[module.id, newContent, '']];
+			update(newContent);
+		});
+	}
+	// When the module is disposed, remove the <style> tags
+	module.hot.dispose(function() { update(); });
+}
+
+/***/ }),
+/* 35 */
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__(36)(undefined);
+// imports
+
+
+// module
+exports.push([module.i, "/*\r\nmodifier--\r\nelement__\r\n*/\nbody, .cover {\n  position: absolute;\n  height: 100%;\n  width: 100%; }\n\nhtml, body {\n  margin: 0;\n  overflow: hidden; }\n  html body, body body {\n    background-color: #444; }\n\n.button {\n  box-shadow: 0px 2px 2px;\n  font-size: 1.3em;\n  border: radius 0.2em; }\n  .button--regular {\n    color: white;\n    background-image: linear-gradient(30deg, #3c501b 10%, #267257 20%); }\n\n/*\r\nalright, an app component is to be inserted inside a display-flex container.\r\n    if you set the flex basis of the component to content, then you can expand and contract the content window...\r\n    what to do if a row/column is too long? I think there's a no wrap property somewhere that may help\r\n\r\n*/\n.flex {\n  display: flex; }\n\n.flush {\n  margin: 0px; }\n\n.canvasAndPlayerContainer {\n  flex-grow: 5;\n  display: flex;\n  flex-direction: column; }\n", ""]);
+
+// exports
+
+
+/***/ }),
+/* 36 */
+/***/ (function(module, exports) {
+
+/*
+	MIT License http://www.opensource.org/licenses/mit-license.php
+	Author Tobias Koppers @sokra
+*/
+// css base code, injected by the css-loader
+module.exports = function(useSourceMap) {
+	var list = [];
+
+	// return the list of modules as css string
+	list.toString = function toString() {
+		return this.map(function (item) {
+			var content = cssWithMappingToString(item, useSourceMap);
+			if(item[2]) {
+				return "@media " + item[2] + "{" + content + "}";
+			} else {
+				return content;
+			}
+		}).join("");
+	};
+
+	// import a list of modules into the list
+	list.i = function(modules, mediaQuery) {
+		if(typeof modules === "string")
+			modules = [[null, modules, ""]];
+		var alreadyImportedModules = {};
+		for(var i = 0; i < this.length; i++) {
+			var id = this[i][0];
+			if(typeof id === "number")
+				alreadyImportedModules[id] = true;
+		}
+		for(i = 0; i < modules.length; i++) {
+			var item = modules[i];
+			// skip already imported module
+			// this implementation is not 100% perfect for weird media query combinations
+			//  when a module is imported multiple times with different media queries.
+			//  I hope this will never occur (Hey this way we have smaller bundles)
+			if(typeof item[0] !== "number" || !alreadyImportedModules[item[0]]) {
+				if(mediaQuery && !item[2]) {
+					item[2] = mediaQuery;
+				} else if(mediaQuery) {
+					item[2] = "(" + item[2] + ") and (" + mediaQuery + ")";
+				}
+				list.push(item);
+			}
+		}
+	};
+	return list;
+};
+
+function cssWithMappingToString(item, useSourceMap) {
+	var content = item[1] || '';
+	var cssMapping = item[3];
+	if (!cssMapping) {
+		return content;
+	}
+
+	if (useSourceMap && typeof btoa === 'function') {
+		var sourceMapping = toComment(cssMapping);
+		var sourceURLs = cssMapping.sources.map(function (source) {
+			return '/*# sourceURL=' + cssMapping.sourceRoot + source + ' */'
+		});
+
+		return [content].concat(sourceURLs).concat([sourceMapping]).join('\n');
+	}
+
+	return [content].join('\n');
+}
+
+// Adapted from convert-source-map (MIT)
+function toComment(sourceMap) {
+	// eslint-disable-next-line no-undef
+	var base64 = btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap))));
+	var data = 'sourceMappingURL=data:application/json;charset=utf-8;base64,' + base64;
+
+	return '/*# ' + data + ' */';
+}
+
+
+/***/ }),
+/* 37 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/*
+	MIT License http://www.opensource.org/licenses/mit-license.php
+	Author Tobias Koppers @sokra
+*/
+
+var stylesInDom = {};
+
+var	memoize = function (fn) {
+	var memo;
+
+	return function () {
+		if (typeof memo === "undefined") memo = fn.apply(this, arguments);
+		return memo;
+	};
+};
+
+var isOldIE = memoize(function () {
+	// Test for IE <= 9 as proposed by Browserhacks
+	// @see http://browserhacks.com/#hack-e71d8692f65334173fee715c222cb805
+	// Tests for existence of standard globals is to allow style-loader
+	// to operate correctly into non-standard environments
+	// @see https://github.com/webpack-contrib/style-loader/issues/177
+	return window && document && document.all && !window.atob;
+});
+
+var getElement = (function (fn) {
+	var memo = {};
+
+	return function(selector) {
+		if (typeof memo[selector] === "undefined") {
+			var styleTarget = fn.call(this, selector);
+			// Special case to return head of iframe instead of iframe itself
+			if (styleTarget instanceof window.HTMLIFrameElement) {
+				try {
+					// This will throw an exception if access to iframe is blocked
+					// due to cross-origin restrictions
+					styleTarget = styleTarget.contentDocument.head;
+				} catch(e) {
+					styleTarget = null;
+				}
+			}
+			memo[selector] = styleTarget;
+		}
+		return memo[selector]
+	};
+})(function (target) {
+	return document.querySelector(target)
+});
+
+var singleton = null;
+var	singletonCounter = 0;
+var	stylesInsertedAtTop = [];
+
+var	fixUrls = __webpack_require__(38);
+
+module.exports = function(list, options) {
+	if (typeof DEBUG !== "undefined" && DEBUG) {
+		if (typeof document !== "object") throw new Error("The style-loader cannot be used in a non-browser environment");
+	}
+
+	options = options || {};
+
+	options.attrs = typeof options.attrs === "object" ? options.attrs : {};
+
+	// Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
+	// tags it will allow on a page
+	if (!options.singleton && typeof options.singleton !== "boolean") options.singleton = isOldIE();
+
+	// By default, add <style> tags to the <head> element
+	if (!options.insertInto) options.insertInto = "head";
+
+	// By default, add <style> tags to the bottom of the target
+	if (!options.insertAt) options.insertAt = "bottom";
+
+	var styles = listToStyles(list, options);
+
+	addStylesToDom(styles, options);
+
+	return function update (newList) {
+		var mayRemove = [];
+
+		for (var i = 0; i < styles.length; i++) {
+			var item = styles[i];
+			var domStyle = stylesInDom[item.id];
+
+			domStyle.refs--;
+			mayRemove.push(domStyle);
+		}
+
+		if(newList) {
+			var newStyles = listToStyles(newList, options);
+			addStylesToDom(newStyles, options);
+		}
+
+		for (var i = 0; i < mayRemove.length; i++) {
+			var domStyle = mayRemove[i];
+
+			if(domStyle.refs === 0) {
+				for (var j = 0; j < domStyle.parts.length; j++) domStyle.parts[j]();
+
+				delete stylesInDom[domStyle.id];
+			}
+		}
+	};
+};
+
+function addStylesToDom (styles, options) {
+	for (var i = 0; i < styles.length; i++) {
+		var item = styles[i];
+		var domStyle = stylesInDom[item.id];
+
+		if(domStyle) {
+			domStyle.refs++;
+
+			for(var j = 0; j < domStyle.parts.length; j++) {
+				domStyle.parts[j](item.parts[j]);
+			}
+
+			for(; j < item.parts.length; j++) {
+				domStyle.parts.push(addStyle(item.parts[j], options));
+			}
+		} else {
+			var parts = [];
+
+			for(var j = 0; j < item.parts.length; j++) {
+				parts.push(addStyle(item.parts[j], options));
+			}
+
+			stylesInDom[item.id] = {id: item.id, refs: 1, parts: parts};
+		}
+	}
+}
+
+function listToStyles (list, options) {
+	var styles = [];
+	var newStyles = {};
+
+	for (var i = 0; i < list.length; i++) {
+		var item = list[i];
+		var id = options.base ? item[0] + options.base : item[0];
+		var css = item[1];
+		var media = item[2];
+		var sourceMap = item[3];
+		var part = {css: css, media: media, sourceMap: sourceMap};
+
+		if(!newStyles[id]) styles.push(newStyles[id] = {id: id, parts: [part]});
+		else newStyles[id].parts.push(part);
+	}
+
+	return styles;
+}
+
+function insertStyleElement (options, style) {
+	var target = getElement(options.insertInto)
+
+	if (!target) {
+		throw new Error("Couldn't find a style target. This probably means that the value for the 'insertInto' parameter is invalid.");
+	}
+
+	var lastStyleElementInsertedAtTop = stylesInsertedAtTop[stylesInsertedAtTop.length - 1];
+
+	if (options.insertAt === "top") {
+		if (!lastStyleElementInsertedAtTop) {
+			target.insertBefore(style, target.firstChild);
+		} else if (lastStyleElementInsertedAtTop.nextSibling) {
+			target.insertBefore(style, lastStyleElementInsertedAtTop.nextSibling);
+		} else {
+			target.appendChild(style);
+		}
+		stylesInsertedAtTop.push(style);
+	} else if (options.insertAt === "bottom") {
+		target.appendChild(style);
+	} else if (typeof options.insertAt === "object" && options.insertAt.before) {
+		var nextSibling = getElement(options.insertInto + " " + options.insertAt.before);
+		target.insertBefore(style, nextSibling);
+	} else {
+		throw new Error("[Style Loader]\n\n Invalid value for parameter 'insertAt' ('options.insertAt') found.\n Must be 'top', 'bottom', or Object.\n (https://github.com/webpack-contrib/style-loader#insertat)\n");
+	}
+}
+
+function removeStyleElement (style) {
+	if (style.parentNode === null) return false;
+	style.parentNode.removeChild(style);
+
+	var idx = stylesInsertedAtTop.indexOf(style);
+	if(idx >= 0) {
+		stylesInsertedAtTop.splice(idx, 1);
+	}
+}
+
+function createStyleElement (options) {
+	var style = document.createElement("style");
+
+	options.attrs.type = "text/css";
+
+	addAttrs(style, options.attrs);
+	insertStyleElement(options, style);
+
+	return style;
+}
+
+function createLinkElement (options) {
+	var link = document.createElement("link");
+
+	options.attrs.type = "text/css";
+	options.attrs.rel = "stylesheet";
+
+	addAttrs(link, options.attrs);
+	insertStyleElement(options, link);
+
+	return link;
+}
+
+function addAttrs (el, attrs) {
+	Object.keys(attrs).forEach(function (key) {
+		el.setAttribute(key, attrs[key]);
+	});
+}
+
+function addStyle (obj, options) {
+	var style, update, remove, result;
+
+	// If a transform function was defined, run it on the css
+	if (options.transform && obj.css) {
+	    result = options.transform(obj.css);
+
+	    if (result) {
+	    	// If transform returns a value, use that instead of the original css.
+	    	// This allows running runtime transformations on the css.
+	    	obj.css = result;
+	    } else {
+	    	// If the transform function returns a falsy value, don't add this css.
+	    	// This allows conditional loading of css
+	    	return function() {
+	    		// noop
+	    	};
+	    }
+	}
+
+	if (options.singleton) {
+		var styleIndex = singletonCounter++;
+
+		style = singleton || (singleton = createStyleElement(options));
+
+		update = applyToSingletonTag.bind(null, style, styleIndex, false);
+		remove = applyToSingletonTag.bind(null, style, styleIndex, true);
+
+	} else if (
+		obj.sourceMap &&
+		typeof URL === "function" &&
+		typeof URL.createObjectURL === "function" &&
+		typeof URL.revokeObjectURL === "function" &&
+		typeof Blob === "function" &&
+		typeof btoa === "function"
+	) {
+		style = createLinkElement(options);
+		update = updateLink.bind(null, style, options);
+		remove = function () {
+			removeStyleElement(style);
+
+			if(style.href) URL.revokeObjectURL(style.href);
+		};
+	} else {
+		style = createStyleElement(options);
+		update = applyToTag.bind(null, style);
+		remove = function () {
+			removeStyleElement(style);
+		};
+	}
+
+	update(obj);
+
+	return function updateStyle (newObj) {
+		if (newObj) {
+			if (
+				newObj.css === obj.css &&
+				newObj.media === obj.media &&
+				newObj.sourceMap === obj.sourceMap
+			) {
+				return;
+			}
+
+			update(obj = newObj);
+		} else {
+			remove();
+		}
+	};
+}
+
+var replaceText = (function () {
+	var textStore = [];
+
+	return function (index, replacement) {
+		textStore[index] = replacement;
+
+		return textStore.filter(Boolean).join('\n');
+	};
+})();
+
+function applyToSingletonTag (style, index, remove, obj) {
+	var css = remove ? "" : obj.css;
+
+	if (style.styleSheet) {
+		style.styleSheet.cssText = replaceText(index, css);
+	} else {
+		var cssNode = document.createTextNode(css);
+		var childNodes = style.childNodes;
+
+		if (childNodes[index]) style.removeChild(childNodes[index]);
+
+		if (childNodes.length) {
+			style.insertBefore(cssNode, childNodes[index]);
+		} else {
+			style.appendChild(cssNode);
+		}
+	}
+}
+
+function applyToTag (style, obj) {
+	var css = obj.css;
+	var media = obj.media;
+
+	if(media) {
+		style.setAttribute("media", media)
+	}
+
+	if(style.styleSheet) {
+		style.styleSheet.cssText = css;
+	} else {
+		while(style.firstChild) {
+			style.removeChild(style.firstChild);
+		}
+
+		style.appendChild(document.createTextNode(css));
+	}
+}
+
+function updateLink (link, options, obj) {
+	var css = obj.css;
+	var sourceMap = obj.sourceMap;
+
+	/*
+		If convertToAbsoluteUrls isn't defined, but sourcemaps are enabled
+		and there is no publicPath defined then lets turn convertToAbsoluteUrls
+		on by default.  Otherwise default to the convertToAbsoluteUrls option
+		directly
+	*/
+	var autoFixUrls = options.convertToAbsoluteUrls === undefined && sourceMap;
+
+	if (options.convertToAbsoluteUrls || autoFixUrls) {
+		css = fixUrls(css);
+	}
+
+	if (sourceMap) {
+		// http://stackoverflow.com/a/26603875
+		css += "\n/*# sourceMappingURL=data:application/json;base64," + btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap)))) + " */";
+	}
+
+	var blob = new Blob([css], { type: "text/css" });
+
+	var oldSrc = link.href;
+
+	link.href = URL.createObjectURL(blob);
+
+	if(oldSrc) URL.revokeObjectURL(oldSrc);
+}
+
+
+/***/ }),
+/* 38 */
+/***/ (function(module, exports) {
+
+
+/**
+ * When source maps are enabled, `style-loader` uses a link element with a data-uri to
+ * embed the css on the page. This breaks all relative urls because now they are relative to a
+ * bundle instead of the current page.
+ *
+ * One solution is to only use full urls, but that may be impossible.
+ *
+ * Instead, this function "fixes" the relative urls to be absolute according to the current page location.
+ *
+ * A rudimentary test suite is located at `test/fixUrls.js` and can be run via the `npm test` command.
+ *
+ */
+
+module.exports = function (css) {
+  // get current location
+  var location = typeof window !== "undefined" && window.location;
+
+  if (!location) {
+    throw new Error("fixUrls requires window.location");
+  }
+
+	// blank or null?
+	if (!css || typeof css !== "string") {
+	  return css;
+  }
+
+  var baseUrl = location.protocol + "//" + location.host;
+  var currentDir = baseUrl + location.pathname.replace(/\/[^\/]*$/, "/");
+
+	// convert each url(...)
+	/*
+	This regular expression is just a way to recursively match brackets within
+	a string.
+
+	 /url\s*\(  = Match on the word "url" with any whitespace after it and then a parens
+	   (  = Start a capturing group
+	     (?:  = Start a non-capturing group
+	         [^)(]  = Match anything that isn't a parentheses
+	         |  = OR
+	         \(  = Match a start parentheses
+	             (?:  = Start another non-capturing groups
+	                 [^)(]+  = Match anything that isn't a parentheses
+	                 |  = OR
+	                 \(  = Match a start parentheses
+	                     [^)(]*  = Match anything that isn't a parentheses
+	                 \)  = Match a end parentheses
+	             )  = End Group
+              *\) = Match anything and then a close parens
+          )  = Close non-capturing group
+          *  = Match anything
+       )  = Close capturing group
+	 \)  = Match a close parens
+
+	 /gi  = Get all matches, not the first.  Be case insensitive.
+	 */
+	var fixedCss = css.replace(/url\s*\(((?:[^)(]|\((?:[^)(]+|\([^)(]*\))*\))*)\)/gi, function(fullMatch, origUrl) {
+		// strip quotes (if they exist)
+		var unquotedOrigUrl = origUrl
+			.trim()
+			.replace(/^"(.*)"$/, function(o, $1){ return $1; })
+			.replace(/^'(.*)'$/, function(o, $1){ return $1; });
+
+		// already a full url? no change
+		if (/^(#|data:|http:\/\/|https:\/\/|file:\/\/\/)/i.test(unquotedOrigUrl)) {
+		  return fullMatch;
+		}
+
+		// convert the url to a full url
+		var newUrl;
+
+		if (unquotedOrigUrl.indexOf("//") === 0) {
+		  	//TODO: should we add protocol?
+			newUrl = unquotedOrigUrl;
+		} else if (unquotedOrigUrl.indexOf("/") === 0) {
+			// path should be relative to the base url
+			newUrl = baseUrl + unquotedOrigUrl; // already starts with '/'
+		} else {
+			// path should be relative to current directory
+			newUrl = currentDir + unquotedOrigUrl.replace(/^\.\//, ""); // Strip leading './'
+		}
+
+		// send back the fixed url(...)
+		return "url(" + JSON.stringify(newUrl) + ")";
+	});
+
+	// send back the fixed css
+	return fixedCss;
+};
+
 
 /***/ })
 /******/ ]);

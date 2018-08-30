@@ -1,6 +1,6 @@
 import React, {Component} from 'react'
 
-export class BooksContainer extends Component{
+export class SearchContainer extends Component{
     constructor(props){
         super(props)
     }
