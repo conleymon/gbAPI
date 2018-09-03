@@ -5,7 +5,7 @@ var queue= new Queue()
 
 export function getFromServer(par={}){
     var nfunc=()=>{}
-    var {query , data , withResult=nfunc , noSuccess=nfunc, getType='json'}=par
+    var {query , data={} , withResult=nfunc , noSuccess=nfunc, getType='json'}=par
     if(!query){
         throw new Error('no query/host submitted to getFromServer get_from_server.js')
     }

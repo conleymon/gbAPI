@@ -6,6 +6,8 @@ import ReactDom from 'react-dom'
 import {prefixId} from 'unique_id'
 import {constants} from 'app_constants'
 import {Queue} from 'queue'
+import {formatResponse,buildQuery} from 'search_box_build_queries'
+import {makeSpy} from 'make_spy'
 var host=constants.host
 
 /*
@@ -23,34 +25,7 @@ var qs=(thing)=>document.querySelector(thing)
 var nfunc=()=>{}
 
 var author='hemmingway'
-var buildQuery=function(input){
-    return host+'?q='+input.value.replace(/\s/g,'+')
-}
-var formatResponse=function(response){
-    return response.items.map((v)=>{
-        var info=v.volumeInfo
-        return {
-            value:info.title,
-            content:(
-                <React.Fragment>
-                    <div>{info.title}</div>
-                    <div>{info.subtitle}</div>
-                    <div>{info.authors.join(', ')}</div>
-                </React.Fragment>
-            )
-        }
-    })
-}
-var makeSpy=function(p={}){
-    var {spyFunc, spiedFunc, thisContext,done}=p
-    var currentHolder=spiedFunc.bind(thisContext)
-    return function(){
-        spyFunc(...arguments)
-        currentHolder(...arguments)
-        if(done){done();}
-    }
 
-}
 describe(prefixId('SearchBox component'),()=>{
     var stage, props, box ,  nativeFetch=fetch
 
@@ -75,9 +50,13 @@ describe(prefixId('SearchBox component'),()=>{
         fetch=nativeFetch
     })
 
+    after((done)=>{
+        ReactDom.render(<React.Fragment><div></div></React.Fragment>,stage,()=>{done()})
+    })
+
     it(prefixId('mounts with empty value'),()=>{
         var input=qs('#testStage input')
-        expect(input.value).to.equal(box.emptyVal)
+        expect(input.value).to.equal(box.emptyVal())
     })
 
     it(prefixId('clears and restores default message properly'),(done)=>{
@@ -85,7 +64,7 @@ describe(prefixId('SearchBox component'),()=>{
 
         var eventFired=false//events are added to runtime queuestack, and may not fire before the evaluation. make a spy that sets eventfired to true when fired, and set handled as a precondition to perform evaluation in the queue 
         var handled=()=>{ eventFired=true }
-        box.handleDefaultText = makeSpy({spyFunc : handled  ,  spiedFunc : box.handleDefaultText  ,  thisContext : box })
+        box.handleDefaultText = makeSpy({spyFunc : handled  ,  spiedFunc : box.handleDefaultText  ,  context : box })
 
         //reattach listeners to spy
         box.componentDidMount()
@@ -107,7 +86,7 @@ describe(prefixId('SearchBox component'),()=>{
 
         // blur and focus with no terms
         addSegment('focus','')
-        addSegment('blur',box.emptyVal)
+        addSegment('blur',box.emptyVal())
 
         // blur and focus with valid terms
         queue.add(()=>{input.value=author})

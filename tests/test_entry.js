@@ -7,4 +7,6 @@ document.querySelector('body').appendChild(testingStage)
 */
 
 require('search_box_tests.js')
+//require('search_tests.js')
+require('form_tests.js')
 
