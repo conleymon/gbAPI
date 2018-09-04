@@ -490,14 +490,29 @@ Queue.promise=function(p={}){//wraps a queue in a task which does then->p.done
   return Object.assign({task,promise,wait:true},p)
 }
 
-Queue.fetch=function(pack={}){//must include 'fetchPackage' parameter  or p will be interpreted as the fetchPackage
-  if(!pack.fetchPackage){pack={fetchPackage:pack}}//use the package if it doesn't contain designated package for the fetch function
+//takes (query,data)  ,  ({query,data})  ,  ({taskParams, fetchPackage:{query,data}})
+Queue.fetch=function(pack={},data={}){
+  //format to {taskParams, fetchPackage:{query,data}} 
+  if(!pack.fetchPackage){
+    pack={
+      fetchPackage:{
+        query : typeof pack==='string' ? pack : pack.query,
+        data : pack.data ? pack.data : data
+      }
+    }  
+  }
+
+  //check format a little bit
+  if(!pack.fetchPackage.query){console.error('invalid fetchPackage subimtted to fetch in Queue', pack)}//use the package if it doesn't contain designated package for the fetch function
+
 
   pack.task=(p)=>{
-    var prom=fetch(pack.fetchPackage)
-    return prom
+    var prom=fetch(pack.fetchPackage.query,pack.fetchPackage.data)
+    return prom instanceof Promise ?prom:new Promise(function(resolve){setTimeout(()=>{resolve()},0)
+    })
   }//Queue promise will extract the promise result and pass it down the queue
-  pack.wait=false
+  
+  pack.wait=false//because you're returning a promise.
   return pack
 }
 Queue.ajax=function(p={}) {

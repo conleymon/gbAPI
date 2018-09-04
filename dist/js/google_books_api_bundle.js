@@ -855,9 +855,1261 @@ function containsNode(outerNode, innerNode) {
 module.exports = containsNode;
 
 /***/ }),
-/* 12 */,
-/* 13 */,
-/* 14 */,
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(module) {
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+/*
+Copyright Conley Johnson 2018
+License:MIT
+
+interrupt and stop should be tested. It may hang the queue upon restart
+interrupt().add(...) may need kickstart
+
+*/
+if (module && module.exports) {
+  var ObjectAnimator = __webpack_require__(31).ObjectAnimator;
+}
+//import {ObjectAnimator} from 'animator'
+
+var clearResults = function clearResults() {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  if (p.constructor === Array) {
+    p = { l: p };
+  }
+  var _p = p,
+      _p$l = _p.l,
+      l = _p$l === undefined ? [] : _p$l; //l stands for line as in queueLine, but any array fitting the queueLine format
+
+  l = arrayWrap(l);
+  var len = l.length;
+  for (var index = 0; index < len; index++) {
+    if (l[index].result !== undefined) {
+      delete l[index].result;
+    }
+    l[index].resolved = false;
+    l[index].initiated = false;
+    l[index].evaluation = null;
+  }
+  return l;
+};
+
+var arrayWrap = function arrayWrap(thing) {
+  if (Object.prototype.toString.call(thing) !== '[object Array]') {
+    return [thing];
+  } else {
+    return thing;
+  }
+};
+
+var format = function format(p) {
+  p = p ? p : function () {}; //if undefined, set with a function	
+  return clearResults(arrayWrap(p).map(function (val) {
+    if (val.constructor === Promise) {
+      val = Queue.promise(val);
+    }
+    if ((typeof val === 'undefined' ? 'undefined' : _typeof(val)) === 'object' && val.task && !val.preCondition && !val.postCondition && val.wait !== false) {
+      val.wait = true;
+    } //if a task is submitted in an object, without conditions and without wait, set wait to true. Otherwise, a function can be submitted raw
+    if (val.constructor === Queue) {
+      val = Queue.queue(val);
+    }
+    if (typeof val === 'function') {
+      val = { task: val };
+    }
+    var _val = val,
+        _val$task = _val.task,
+        task = _val$task === undefined ? function () {} : _val$task,
+        _val$preCondition = _val.preCondition,
+        preCondition = _val$preCondition === undefined ? function () {
+      return true;
+    } : _val$preCondition,
+        _val$postCondition = _val.postCondition,
+        postCondition = _val$postCondition === undefined ? function () {
+      return true;
+    } : _val$postCondition,
+        _val$wait = _val.wait,
+        wait = _val$wait === undefined ? false : _val$wait,
+        _val$name = _val.name,
+        name = _val$name === undefined ? undefined : _val$name,
+        _val$comment = _val.comment,
+        comment = _val$comment === undefined ? '' : _val$comment,
+        _val$sec = _val.sec,
+        sec = _val$sec === undefined ? 3600 : _val$sec,
+        _val$timeout = _val.timeout,
+        timeout = _val$timeout === undefined ? function () {} : _val$timeout,
+        _val$earlyTermination = _val.earlyTermination,
+        earlyTermination = _val$earlyTermination === undefined ? function () {} : _val$earlyTermination,
+        _val$getValue = _val.getValue,
+        getValue = _val$getValue === undefined ? false : _val$getValue,
+        _val$getValueFromTask = _val.getValueFromTask,
+        getValueFromTask = _val$getValueFromTask === undefined ? false : _val$getValueFromTask,
+        _val$queue = _val.queue,
+        queue = _val$queue === undefined ? false : _val$queue;
+
+    return { task: task, preCondition: preCondition, postCondition: postCondition, wait: wait, name: name, comment: task.toString(), sec: sec, timeout: timeout, earlyTermination: earlyTermination, getValue: getValue, getValueFromTask: getValueFromTask, initiated: false, resolved: false, queue: queue, subscriptions: new Map(), evaluation: null
+      //wait means, wait for a restart from the task. getvalue is an override function for retrieving the value to store after the promise is done. if not set, the argument provided by done is used
+    };
+  }));
+};
+
+//formfunctions
+function formToObject(form) {
+  var obj = {};
+  var elemarray;
+  if (typeof form === 'string' || typeof form === 'number') {
+    elemArray = document.getElementById(form).elements;
+  } else {
+    elemarray = form.elements;
+  }
+  var elemlen = elemarray.length;
+  var checknum; //for trying to convert strings to numbers
+  for (var i = 0; i < elemlen; i++) {
+    var n = elemarray[i].name.replace(/\[\]/g, '');
+    if (n == '') {
+      n = elemarray[i].id;
+    }
+    obj[n] = elemarray[i].value;
+    checknum = Number(obj[n]);if (!isNaN(checknum)) {
+      obj[n] = checknum;
+    }
+    if (elemarray[i].type == 'checkbox') {
+      obj[n] = elemarray[i].checked;
+    }
+    if (elemarray[i].type == 'select-multiple') {
+      obj[n] = getMultipleSelectValues(elemarray[i]);
+    }
+  }
+  return obj;
+}
+
+function getMultipleSelectValues(select) {
+  var result = [];
+  var options = select && select.options;
+  var opt;
+  for (var i = 0, iLen = options.length; i < iLen; i++) {
+    opt = options[i];
+    if (opt.selected) {
+      result.push(opt.value || opt.text);
+    }
+  }
+  result = result.map(cSTFV);
+  return result;
+}
+
+function cSTFV(val) {
+  //convert strings to functional values
+  if (val === 'true') {
+    return true;
+  }
+  if (val === 'false') {
+    return false;
+  }
+  var v = Number(val);
+  if (!isNaN(val)) {
+    return v;
+  } else {
+    return val;
+  }
+}
+//end form functions
+
+function Queue() {
+  var _this = this;
+
+  var queueLine = []; //where the tasks and conditions are stored
+  var queueMap = new Map(); //taskobj->name,index
+  //queueMap is for quick searches
+  var queueIndex = 0; //iteratorguide for the queue
+  var queueLength = 0; //number of tasks queued up
+  var queueHandle = false; //the handle for the timeouts
+  var timeoutHandle = false; //each 
+  var checkSpeed = 175; //interval for conditional checks
+  var checksRunning = false,
+      waitRunning = false;
+  var terminated = false; //stopped callback has been called, and it is locked, unless explicitly opened by calling a modifier (like add, or splice) or calling start({unterminate:true})
+  var callBack = function callBack() {};
+  var initialValue = undefined;
+  var subscriptions = new Map();
+  var repeat = false;
+
+  this.running = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    if (p.detail) {
+      return { checksRunning: checksRunning, waitRunning: waitRunning };
+    };return checksRunning || waitRunning;
+  };
+
+  this.setCheckSpeed = function (speed) {
+    checkSpeed = speed;return _this;
+  };
+
+  this.finally = function (cb) {
+    callBack = cb;
+    if (!more() && queueLength > 0 && queueLine[queueIndex].resolved) {
+      cb(_this.status(true));
+    };
+    return _this;
+  };
+
+  this.initVal = function (v) {
+    initialValue = v;
+  };
+
+  this.status = function () {
+    var control = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+    return {
+      currentTask: queueLine[queueIndex],
+      queueLength: queueLength,
+      queueIndex: queueIndex,
+      waitRunning: waitRunning,
+      checksRunning: checksRunning,
+      queueLine: queueLine.slice(),
+      control: control ? this : null
+    };
+  };
+
+  this.currentVal = function () {
+    return queueLength > 0 && queueLine[queueIndex] ? queueLine[queueIndex].result : initialValue;
+  };
+
+  this.lastVal = function () {
+    return queueLength > 0 && queueLine[queueLength - 1] ? queueLine[queueLength - 1].result : initialValue;
+  };
+
+  this.add = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var insert = arguments[1];
+    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
+    var actions = this.format(p);
+    if (!insert) {
+      queueLine.push.apply(queueLine, actions);
+    } else {
+      queueLine.splice.apply(queueLine, [queueIndex + 1, 0].concat(_toConsumableArray(actions)));
+    }
+    bookKeep();
+    return this;
+  };
+
+  this.insert = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
+    this.add(p, true);
+  };
+
+  this.repeat = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    repeat = true;
+  };
+
+  this.clear = function () {
+    this.stop({ clear: true });queueIndex = 0;queueLine.length = 0;bookKeep();return this;
+  };
+
+  this.stop = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    //wait bool, clear bool, terminate bool
+    clearTimeout(queueHandle);
+    checksRunning = false;waitRunning = false;
+    if (p.wait && !p.clear) {
+      waitRunning = true;
+    } else {
+      clearTimeout(timeoutHandle);
+    }
+    if (p.terminate) {
+      terminated = true;clearTimeout(timeoutHandle);
+      callBack(this.status(true));
+      this.publish();
+    }
+    return this;
+  };
+
+  this.kickStart = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    if (_this.running()) {
+      return;
+    }
+    _this.start();
+    return _this;
+  };
+
+  this.start = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    if (terminated && !p.unterminate) {/*console.error('this queue has been terminated. to restart, restart({unterminate:true}) queue.js start()')*/} else {
+      terminated = false;
+    }
+    if (p.indexMatch) {
+      if (p.indexMatch !== queueIndex) {
+        /*console.log('tried to restart:'+p.indexMatch+'. current index:'+queueIndex);*/return _this;
+      }
+    }
+    if (p.initialValue !== undefined) {
+      initialValue = p.initialValue;
+    } //only matters when starting from 0
+    if (p.callBack) {
+      _this.finally(p.callBack);
+    }
+    clearTimeout(queueHandle);clearTimeout(timeoutHandle);listen();
+    return _this;
+  };
+
+  var listen = function listen() {
+    checksRunning = true;waitRunning = true;
+    var q = queueLine[queueIndex];
+    if (!q.initiated) {
+      if (q.preCondition()) {
+        var result = q.task(getControlPackage());
+        if (result instanceof Promise) {
+          _this.insert(result);
+        } //should route through Queue.promise, where then->(result)=>p.done(result) will be attached
+        if (!q.wait) {
+          q.result = result;
+        }
+        q.initiated = true;
+      }
+      if (q.wait) {
+        _this.stop({ wait: true });return; //advance will be triggered at the end of the task. generally postCondition return true, but thats up to the developer
+      }
+    }
+    if (q.initiated) {
+      if (q.postCondition()) {
+        if (q.getValue) {
+          q.result = q.getValue(getControlPackage({ includeDone: false }));
+        };q.resolved = true;_this.moveOn();return;
+      }
+    }
+    queueHandle = setTimeout(function () {
+      listen();
+    }, checkSpeed);
+  };
+
+  var getControlPackage = function getControlPackage() {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var _p$includeDone = p.includeDone,
+        includeDone = _p$includeDone === undefined ? true : _p$includeDone;
+
+    var ret = {
+      control: _this,
+      done: function (indexMatch, result) {
+        var _this2 = this;
+
+        if (queueLine[indexMatch] === undefined) {
+          /*console.log('index '+indexMatch+' no longer exists in queue. queue.js listen()');*/return;
+        }
+        queueLine[indexMatch].result = result;
+        if (!waitRunning) {
+          return;
+        }
+        setTimeout(function () {
+          _this2.start({ indexMatch: indexMatch });
+        }, 0); //set timeout is to take it out of the call stack
+      }.bind(_this, queueIndex),
+      result: getPreviousResult(),
+      evaluate: function (task, val) {
+        task.evaluation = val;
+      }.bind(_this, queueLine[queueIndex])
+    };
+    if (!includeDone) {
+      delete ret.done;
+    }
+    return ret;
+  };
+
+  var finished = function finished() {
+    return queueIndex >= queueLength - 1 && terminated;
+  };
+
+  var more = function more() {
+    return queueLine[queueIndex + 1];
+  };
+
+  this.moveOn = function () {
+    //move to the next step if it exists. if not, terminate/ should be the only way to advance
+    _this.publishTask({ task: queueLine[queueIndex] });
+    if (!more() && !repeat) {
+      _this.stop({ terminate: true });return false;
+    }
+    if (!repeat) {
+      queueIndex++;
+    } else {
+      clearResults([queueLine[queueIndex]]);
+    }
+    repeat = false;
+    _this.start();
+    startTimeout();
+    return true;
+  };
+
+  var startTimeout = function startTimeout() {
+    clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(function () {
+      queueLine[queueIndex].timeout(getControlPackage({ includeDone: false }));
+      _this.moveOn(); //going to have to make this explicitly the devs responsibility or take this control off the table. 
+    }, queueLine[queueIndex].sec * 1000);
+  };
+  var getPreviousResult = function getPreviousResult() {
+    if (queueLine[queueIndex].getValueFromTask) {
+      var look = queueLine[queueIndex].getValueFromTask;
+      if (typeof look === 'string') {
+        for (var _m = 0; _m < queueLength; _m++) {
+          if (queueLine[_m].name === look) {
+            return queueLine[_m].result;
+          }
+        }
+      } else if (typeof look === 'number' && Math.abs(look) >= m) {
+        return queueLine[queueIndex - Math.abs(look)].result;
+      }
+    }
+    return queueIndex > 0 ? queueLine[queueIndex - 1].result : initialValue;
+  };
+
+  this.change = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    queueLine.splice(queueIndex + 1);
+    return _this.add(p); //add will bookkeep
+  };
+
+  this.interrupt = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //only performs the earlyTermination func..you have to then stop or moveon
+    var and = p.and;
+
+    if (queueLine[queueIndex]) {
+      queueLine[queueIndex].earlyTermination(getControlPackage({ includeDone: false }));
+    }
+    if (and === 'stop') {
+      _this.stop();
+    } else {
+      _this.moveOn();
+    }
+    return _this;
+  };
+
+  this.splice = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    //splices queueLine, but uses search  to find the indexes
+    var _p$replacement = p.replacement,
+        replacement = _p$replacement === undefined ? [] : _p$replacement;
+
+    var _getIndexes = getIndexes(p),
+        from = _getIndexes.from,
+        to = _getIndexes.to; //{action, index}
+
+
+    if (from.index < queueIndex + 1) {
+      console.log('from index' + from.index + ' includes past/current tasks in the queue. setting from index to very next task index.');
+    }
+    from.index = queueIndex + 1;
+    if (from.index > to.index) {
+      console.error('indexes off->queue.js->splice()', { from: from, to: to });
+    } else {
+      var remove = to.index - from.index + 1; //plus 1 is to make it inclusive of the last element
+      queueLine.splice.apply(queueLine, [from.index, remove].concat(_this.format(replacement)));
+      bookKeep();
+    }
+    return _this;
+  };
+
+  this.delete = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    var found = this.find(p);
+    if (found.index < queueIndex + 1) {
+      console.error('task is past or current. Cannot be deleted');return this;
+    }
+    if (found) {
+      queueLine.splice(found.index, 1);bookKeep();
+    }
+    return this;
+  };
+
+  this.pop = function () {
+    if (queueIndex === queueLength - 1) {
+      console.error('tried to pop last task, which has already been initiated queue.js->pop');return _this;
+    }
+    queueLine.pop();bookKeep();return _this;
+  };
+
+  this.slice = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    //returns a new array with new shallow action object clones. setting their properties will not alter the action objects they were cloned from
+    //however,performing methods on the sliced action objects will operate on the originals
+    //and in fact some of the functions submitted will operate on important closure variables
+    var _ref = p.from || p.to ? getIndexes(p) : { from: { index: 0 } //if none submitted, splice the whole queueline 
+    },
+        from = _ref.from,
+        to = _ref.to;
+
+    if (to && from.index > to.index || !from) {
+      console.error('indexes off->queue.js->get()', { from: from, to: to });return [];
+    } else {
+      //
+      var args = to ? [from.index, to.index] : [from.index];
+      if (args.indexOf(undefined) !== -1) {
+        console.error(new Error('unable to find criteria'), from, to);return [];
+      }
+      var ret = clearResults(queueLine.slice.apply(queueLine, args).map(function (val) {
+        return Object.assign({}, val);
+      }));
+      ret.forEach(function (val) {
+        var newMap = new Map();
+        val.subscriptions.forEach(function (v, k) {
+          newMap.set(k, v);
+        });
+        val.subscriptions = newMap;
+      });
+      return ret;
+    }
+  };
+
+  var getIndexes = function getIndexes() {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    return { from: _this.find(p.from), to: _this.find(p.to) };
+  };
+
+  this.find = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    return queueMap.get(p.name || p.index || p.taskObj || p.task);
+    //you could actually extend this to search by any criteria in the queueline
+  };
+
+  var bookKeep = function bookKeep() {
+    //stores keys by name, index,task[the function to execute], action[the action package submitted] 
+    //tears map down and rebuilds because queueLine indexes shift
+    //modifying the queueLine calls bookKeep. renders containing loops order 5*A*N where A is the number of outer iterations and N is the number of tasks in the queue 
+    queueMap.clear();queueLength = queueLine.length;
+    for (var index = 0; index < queueLength; index++) {
+      var action = queueLine[index];
+      var pack = { action: action, index: index },
+          task = action.task,
+          name = action.name; //take out the name and task for setting in map
+      if (_this.find({ name: name })) {
+        console.error('duplicate names queue.js bookKeep', name, index);
+      }
+      if (_this.find({ taskObj: pack })) {
+        console.error('duplicate taskObjects. second dup. will be skipped. queue.js bookKeep', name, index);
+      }
+      if (_this.find({ task: task })) {
+        console.error('duplicate tasks, only the last inserted can be returned through find queue.js bookKeep', name, index);
+      }
+      if (name !== undefined) {
+        queueMap.set(name, pack);
+      }
+      queueMap.set(index, pack);
+      queueMap.set(action, pack); //duplicate packs??
+      queueMap.set(task, pack); //duplicate functions should be allowed.
+    }
+    if (!_this.allDone()) {
+      terminated = false;
+    }
+  };
+
+  this.clearResults = function () {
+    clearResults(queueLine);return _this;
+  };
+
+  this.reset = function () {
+    queueIndex = 0;_this.clearResults();return _this;
+  };
+
+  this.format = function (p) {
+    return format(p);
+  };
+
+  this.allDone = function () {
+    return queueLine.every(function (val) {
+      val.resolved;
+    });
+  };
+
+  this.subscribe = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var cb = p.cb;
+
+    if (typeof p === 'function') {
+      cb = p;
+    }
+    if (!cb) {
+      console.error('queue.js subscribe(func||{cb:func})->no function');
+    }
+    subscriptions.set(cb, 1);
+    return _this;
+  };
+
+  this.unsubscribe = function (p) {
+    var cb = p.cb;
+
+    if (typeof p === 'function') {
+      cb = p;
+    }
+    subscriptions.delete(cb);
+    return _this;
+  };
+
+  this.publish = function () {
+    var _this3 = this;
+
+    //publishes that the entire queue is finished
+    subscriptions.forEach(function (v, k) {
+      k(_this3.status());
+    });
+    subscriptions.clear();
+  };
+
+  this.subscribeTask = function (p) {
+    var name = p.name,
+        index = p.index,
+        cb = p.cb;
+
+    if (!cb) {
+      console.error('queue.js subscribeTask({name||index,cb})->no function to attach:', p);return _this;
+    }
+    var task = _this.find(p);
+    if (!task) {
+      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
+    }
+    if (task.resolved) {
+      cb(task);return _this;
+    }
+    task.subscriptions.set(cb, 1);
+    return _this;
+  };
+
+  this.unsubscribeTask = function (p) {
+    var name = p.name,
+        index = p.index,
+        cb = p.cb,
+        _p$check = p.check,
+        check = _p$check === undefined ? false : _p$check;
+
+    if (!cb) {
+      console.error('queue.js subscribeTask({name||index,cb})->no function to unattach:', p);return _this;
+    }
+    var task = _this.find(p);
+    if (!task) {
+      console.error('queue.js subscribeTask()->unable to find task:', p);return _this;
+    }
+    if (check) {
+      console.log('task', task, 'has callback' + cb.toString(), task.subscriptions.has(cb));
+    }
+    task.subscriptions.delete(cb, 1);
+    return _this;
+  };
+
+  this.publishTask = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var task = p.task;
+    if (!task) {
+      return this;
+    }
+    var subscriptions = task.subscriptions;
+    subscriptions.forEach(function (v, k) {
+      k(task);
+    });
+    subscriptions.clear();
+    return this;
+  };
+
+  this.all = function (p) {
+    _this.add(Queue.all(p));return _this;
+  };
+  this.insertAll = function (p) {
+    _this.insert(Queue.all(p));return _this;
+  };
+
+  this.race = function (p) {
+    _this.add(Queue.race(p));return _this;
+  };
+  this.insertRace = function (p) {
+    _this.insert(Queue.race(p));return _this;
+  };
+
+  this.wait = function (p) {
+    _this.add(Queue.wait(p));return _this;
+  };
+  this.insertWait = function (p) {
+    _this.insert(Queue.wait(p));return _this;
+  };
+
+  this.animate = function (p) {
+    _this.add(Queue.animate(p));return _this;
+  };
+  this.insertAnimate = function (p) {
+    _this.insert(Queue.animate(p));return _this;
+  };
+
+  this.transition = function (p) {
+    _this.add(Queue.transition(p));return _this;
+  };
+  this.insertTransition = function (p) {
+    _this.insert(Queue.transition(p));return _this;
+  };
+
+  this.blink = function (p) {
+    _this.add(Queue.blink(p));return _this;
+  };
+  this.insertBlink = function (p) {
+    _this.insert(Queue.blink(p));return _this;
+  };
+
+  this.listen = function (p) {
+    _this.add(Queue.listen(p));return _this;
+  };
+  this.insertListen = function (p) {
+    _this.insert(Queue.listen(p));return _this;
+  };
+
+  this.listenTask = function (p) {
+    _this.add(Queue.listenTask(p));return _this;
+  };
+  this.insertListenTask = function (p) {
+    _this.insert(Queue.listenTask(p));return _this;
+  };
+
+  this.ajax = function (p) {
+    _this.add(Queue.ajax(p));return _this;
+  };
+  this.insertAjax = function (p) {
+    _this.insert(Queue.ajax(p));return _this;
+  };
+
+  this.fetch = function (p) {
+    _this.add(Queue.fetch(p));return _this;
+  };
+  this.insertFetch = function (p) {
+    _this.insert(Queue.fetch(p));return _this;
+  };
+
+  this.loadIFrame = function (p) {
+    _this.add(Queue.loadIFrame(p));return _this;
+  };
+  this.insertLoadIFrame = function (p) {
+    _this.insert(Queue.loadIFrame(p));return _this;
+  };
+}
+
+Queue.wait = function (time) {
+  //time in ms
+  if ((typeof time === 'undefined' ? 'undefined' : _typeof(time)) === 'object' && time.from && time.to) {
+    var time = Math.random() * (time.to - time.from);
+  }
+  var task = function task(p) {
+    setTimeout(function () {
+      p.done(p.result);
+    }, time);
+  }; //pass previous result through					 
+  return { task: task };
+};
+
+Queue.queue = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //starts another Queue instance and hooks up the call back 
+  var queue = p.queue;
+
+  if (p.constructor === Queue) {
+    queue = p;
+  }
+  var task = function task(p) {
+    queue.clearResults().reset().finally(p.done).kickStart();
+  };
+  return Object.assign({ task: task, wait: true, queue: queue }, p);
+};
+
+Queue.promiseWrap = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //creates a promise, hooks this queue up to that promise (through finally) and returns the promise
+  var toDo = p.toDo; //async function, queue, promise
+
+  if (!toDo || !toDo.constructor) {
+    console.log('wrong argument in promiseWrap queue.js argument submitted:', p);return;
+  }
+  var resolve = function resolve(res) {
+    if (toDo.constructor === Queue) {
+      this.finally(res);
+    }
+    /*
+    tasks need a queue to activate them.
+    you might wrap an asynchronous function in a promise
+      hmm, queue should take asynchronous functions...
+    and other another promise?
+    */
+  };
+  return new Promise(resolve);
+};
+
+Queue.promise = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //wraps a queue in a task which does then->p.done 
+  var promise = p.promise;
+
+  if (p instanceof Promise) {
+    promise = p;
+  }
+  var task = function task(par) {
+    //executed when reached in the queue. 
+    promise.then(function (result) {
+      par.done(result);
+    }, function (result) {
+      par.done(result);
+    });
+  };
+  return Object.assign({ task: task, promise: promise, wait: true }, p);
+};
+
+//takes (query,data)  ,  ({query,data})  ,  ({taskParams, fetchPackage:{query,data}})
+Queue.fetch = function () {
+  var pack = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+  //format to {taskParams, fetchPackage:{query,data}} 
+  if (!pack.fetchPackage) {
+    pack = {
+      fetchPackage: {
+        query: typeof pack === 'string' ? pack : pack.query,
+        data: pack.data ? pack.data : data
+      }
+    };
+  }
+
+  //check format a little bit
+  if (!pack.fetchPackage.query) {
+    console.error('invalid fetchPackage subimtted to fetch in Queue', pack);
+  } //use the package if it doesn't contain designated package for the fetch function
+
+
+  pack.task = function (p) {
+    var prom = fetch(pack.fetchPackage.query, pack.fetchPackage.data);
+    return prom instanceof Promise ? prom : new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve();
+      }, 0);
+    });
+  }; //Queue promise will extract the promise result and pass it down the queue
+
+  pack.wait = false; //because you're returning a promise.
+  return pack;
+};
+Queue.ajax = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var _p$url = p.url,
+      url = _p$url === undefined ? '' : _p$url,
+      _p$data = p.data,
+      data = _p$data === undefined ? {} : _p$data,
+      _p$synch = p.synch,
+      synch = _p$synch === undefined ? true : _p$synch,
+      _p$method = p.method,
+      method = _p$method === undefined ? 'POST' : _p$method;
+
+  var xhr = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
+  var task = function task() {
+    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    var params;
+    if (data.nodeName && data.nodeName.toLowerCase() === 'form') {
+      if (data.action) {
+        url = data.action;
+      };
+      params = formToObject(data);
+    }
+    params = typeof data == 'string' ? data : Object.keys(data).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]);
+    }).join('&');
+
+    xhr.addEventListener('readystatechange', function () {
+      console.log(xhr.status);
+    });
+    xhr.addEventListener('load', function () {
+      par.done({ response: xhr.responseText, status: xhr.status });
+    });
+    xhr.open(method, url, synch);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(params);
+  };
+  return Object.assign({ task: task, wait: true, xhr: xhr }, p);
+};
+
+Queue.loadIFrame = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var url = p.url,
+      IFrame = p.IFrame,
+      src = p.src;
+
+  if (!url) {
+    url = src;
+  }
+  var task = function task() {
+    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    IFrame.addEventListener('load', function () {
+      par.done(IFrame);
+    });
+    IFrame.src = url;
+  };
+  return Object.assign({ task: task }, p);
+};
+
+Queue.listen = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var queue = p.queue,
+      _p$start = p.start,
+      start = _p$start === undefined ? false : _p$start;
+
+  if (p.constructor === Queue) {
+    queue = p;
+  }
+  var task = function task(p) {
+    if (queue.allDone()) {
+      p.done();return;
+    }
+    queue.subscribe({ cb: p.done });
+    if (start) {
+      queue.kickStart();
+    }
+  };
+  return Object.assign({ task: task, wait: true }, p);
+};
+
+Queue.listenTask = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var _p$queue = p.queue,
+      queue = _p$queue === undefined ? new Queue() : _p$queue,
+      _p$name = p.name,
+      name = _p$name === undefined ? 'null12345' : _p$name,
+      index = p.index,
+      _p$start2 = p.start,
+      start = _p$start2 === undefined ? false : _p$start2;
+
+  var task = function task(p) {
+    var t = queue.find({ name: name, index: index });
+    if (!t) {
+      console.error('queue.js Queue.listenTask({queue,name,index,start}) task not found for listening');
+    }
+    if (t && t.resolved) {
+      p.done(t.result);return;
+    }
+    queue.subscribeTask({ name: name, index: index, cb: p.done });
+    if (start) {
+      queue.kickStart();
+    }
+  };
+  return Object.assign({ task: task, wait: true }, p);
+};
+
+Queue.race = function (p) {
+  return Queue.all(p, true);
+};
+
+Queue.all = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var race = arguments[1];
+
+  var stalls = [];
+  var queue,
+      useP = p.constructor === Array; //is p the raw data or part of a package
+  var actions = (useP ? p : p.actions).map(function (val) {
+    return format(val);
+  });
+  if (actions.length === 0) {
+    return {};
+  }
+  var doneHolder = { done: function done() {} //place holder for the allTask resolution function
+  };var check = function check() {
+    return stalls.every(function (val) {
+      return val.resolved;
+    });
+  };
+  var retrieve = function retrieve(i, result) {
+    //result is a status() request submitted by the finally call after each stall queue finishes. So an allTask returns an array of all the final status requests of all it's tasks.
+    stalls[i].result = result;
+    stalls[i].resolved = true;
+    if (race) {
+      doneHolder.done(result);check = function check() {
+        return false;
+      };
+    }
+    if (check()) {
+      doneHolder.done(stalls.map(function (val) {
+        return val.result;
+      }));
+    }
+  };
+  actions.forEach(function (val, i) {
+    queue = new Queue().add(val).finally(retrieve.bind(null, i)); //queues should call back with the status report
+    stalls[i] = { queue: queue, result: undefined, resolved: false };
+  });
+  var earlyTermination = function earlyTermination() {
+    stalls.forEach(function (val) {
+      if (val.queue) {
+        val.queue.interrupt({ and: 'stop' });
+      }
+    });
+  };
+  var task = function task(p) {
+    doneHolder.done = p.done;
+    stalls.forEach(function (val) {
+      val.queue.start();
+    });
+  };
+  return Object.assign({ task: task, earlyTermination: earlyTermination }, useP ? {} : p);
+};
+
+Queue.transition = function () {
+  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var node = par.node,
+      style = par.style,
+      _par$duration = par.duration,
+      duration = _par$duration === undefined ? 1 : _par$duration,
+      _par$timing = par.timing,
+      timing = _par$timing === undefined ? 'ease-in-out' : _par$timing,
+      _par$synch = par.synch,
+      synch = _par$synch === undefined ? true : _par$synch,
+      _par$contours = par.contours,
+      contours = _par$contours === undefined ? {} : _par$contours;
+
+  var task = function task(p) {
+    //hook up the function
+    var evFunc = function evFunc() {
+      node.removeEventListener('transitionend', evFunc);
+      p.done();
+    };
+    node.addEventListener('transitionend', evFunc);
+    //set the transition
+    if (synch && style.transform) {
+      var _Queue$synchTransform = Queue.synchTransform({ orig: node.style.transform, dest: style.transform }),
+          dest = _Queue$synchTransform.dest;
+
+      style.transform = dest;
+    }
+    var transProps = [];
+    for (var k in style) {
+      transProps.push(k + ' ' + duration + 's ' + timing);
+    }
+    Object.assign(node.style, { transition: transProps.join(', ') }, style);
+    //set the style
+  };
+  return Object.assign({ task: task, wait: true }, par);
+};
+
+Queue.animate = function () {
+  var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  if (!ObjectAnimator) {
+    console.error('You need the animator dependency to use this method.');return function () {};
+  }
+  var animation = new ObjectAnimator(); //if the conductor is on the window, it will be used. otherwise, either the animator will run on it's own, or a dev will need to store a conductor somewhere then use " var animation=new ObjectAnimator({conductor})"
+  var task = function task(p) {
+    par.postAnim = function () {
+      p.done();
+    };
+    animation.loadAnimation(par).animate();
+  };
+  return Object.assign({ task: task, wait: true, earlyTermination: function earlyTermination() {
+      animation.stop();
+    }, animation: animation }, par);
+};
+
+Queue.blink = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var node = p.node,
+      _p$repeat = p.repeat,
+      repeat = _p$repeat === undefined ? 1 : _p$repeat,
+      _p$interval = p.interval,
+      interval = _p$interval === undefined ? 500 : _p$interval,
+      _p$proportion = p.proportion,
+      proportion = _p$proportion === undefined ? .5 : _p$proportion;
+
+  var tasks = [];
+  for (var i = 0; i < repeat; i++) {
+    tasks.push(function () {
+      node.style.opacity = 0;
+    }, Queue.wait(interval * (1 - proportion)), function () {
+      node.style.opacity = 1;
+    }, Queue.wait(interval * proportion));
+  }
+  tasks.pop(); //no need to wait after the last blink
+  return tasks;
+};
+
+Queue.synchTransform = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //orig and dest should be strings
+  var orig = p.orig,
+      dest = p.dest,
+      origArray = [],
+      destArray = [],
+      origU = new Map(),
+      destU = new Map(),
+      origVal;
+
+  var breakOrig = orig.match(/[a-zA-Z]+\([^\)]*\)/g),
+      breakDest = dest.match(/[a-zA-Z]+\([^\)]*\)/g);
+  if (breakOrig) {
+    breakOrig.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');origU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakOrig = [];
+  }
+  if (breakDest) {
+    breakDest.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');destU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakDest = [];
+  }
+  origU.forEach(function (v, k) {
+    destArray.push(destU.has(k) ? destU.get(k) : origU.get(k));
+    origArray.push(origU.get(k));
+    destU.delete(k);
+  });
+  destU.forEach(function (v, k) {
+    destArray.push(destU.get(k));
+    origArray.push(origU.has(k) ? origU.get(k) : transformDefaultTable[k]);
+  });
+  return { orig: origArray.join(' '), dest: destArray.join(' ') };
+};
+
+//if(window.wait===undefined){window.wait=Queue.wait}
+//if(window.animate===undefined){window.animate=Queue.animate}
+//if(window.transition===undefined){window.transition=Queue.transition}
+
+var transformDefaultTable = {
+  //matrices and perspective must be set already to animate
+  translate: 'translate(0,0)',
+  translate3d: 'translate3d(0,0,0)',
+  translateX: 'translateX(0)',
+  translateY: 'translateY(0)',
+  translateZ: 'translateZ(0)',
+  scale: 'scale(1,1)',
+  scale3d: 'scale3d(1,1,1)',
+  scaleX: 'scaleX(1)',
+  scaleY: 'scaleY(1)',
+  scaleZ: 'scaleZ(1)',
+  rotate: 'rotate(0deg)',
+  rotate3d: 'rotate3d(0,0,0,0deg)',
+  rotateX: 'rotateX(0deg)',
+  rotateY: 'rotateY(0deg)',
+  rotateZ: 'rotateZ(0deg)',
+  skew: 'skew(0deg,0deg)',
+  skewX: 'skewX(0deg)',
+  skewY: 'skewY(0deg)'
+};
+exports.Queue = Queue;
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(30)(module)))
+
+/***/ }),
+/* 13 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+var constants = exports.constants = {
+    host: 'https://www.googleapis.com/books/v1/volumes'
+};
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.getFromServerThrottledSingleton = exports.getFromServerThrottled = undefined;
+exports.getFromServer = getFromServer;
+
+var _queue = __webpack_require__(12);
+
+var _throttle_func = __webpack_require__(33);
+
+var queue = new _queue.Queue();
+
+function getFromServer() {
+    var par = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    var nfunc = function nfunc() {};
+    var query = par.query,
+        _par$data = par.data,
+        data = _par$data === undefined ? {} : _par$data,
+        _par$withResult = par.withResult,
+        withResult = _par$withResult === undefined ? nfunc : _par$withResult,
+        _par$noSuccess = par.noSuccess,
+        noSuccess = _par$noSuccess === undefined ? nfunc : _par$noSuccess,
+        _par$sec = par.sec,
+        sec = _par$sec === undefined ? 15 : _par$sec,
+        _par$getType = par.getType,
+        getType = _par$getType === undefined ? 'json' : _par$getType;
+    var _par$timeout = par.timeout,
+        timeout = _par$timeout === undefined ? function () {
+        console.log('server at ' + query + ' timed out');
+    } : _par$timeout;
+
+    if (!query) {
+        throw new Error('no query/host submitted to getFromServer get_from_server.js');
+    }
+    if (queue.status().queueLength === 0) {
+        //if the queue has completed the last fetch, get a new one
+
+        var pack = {
+            fetchPackage: par,
+            timeout: timeout,
+            sec: sec
+        };
+
+        queue.fetch(pack).add(function (p) {
+            //check result ok
+            if (!p.result.ok) {
+                p.control.change(); //change wipes out future steps
+                noSuccess(p.result);
+            }
+            return p.result; //when a raw function is submitted to the queue, it's return value is accepted as the result of the task
+        }).add(function (p) {
+            return p.result[getType]();
+        }) //should be a promise
+        .add(function (p) {
+            withResult(p.result);
+        }).kickStart();
+    } else {
+        //if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
+        queue.finally(function (p) {
+            p.control.clear().finally(nfunc); //finally persists and would cause a loop above if not replaced before restarting.
+            getFromServer(par);
+        });
+    }
+}
+var getFromServerThrottled = exports.getFromServerThrottled = function getFromServerThrottled(thresh) {
+    return (0, _throttle_func.throttleFunc)(getFromServer, thresh);
+};
+var getFromServerThrottledSingleton = exports.getFromServerThrottledSingleton = (0, _throttle_func.throttleFunc)(getFromServer);
+
+/***/ }),
 /* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -882,11 +2134,17 @@ var _reactDom = __webpack_require__(20);
 
 var _reactDom2 = _interopRequireDefault(_reactDom);
 
-var _search = __webpack_require__(29);
+var _search_box = __webpack_require__(32);
+
+var _search_box_build_queries = __webpack_require__(34);
+
+var _Form = __webpack_require__(43);
+
+var _collapsible_flex_item = __webpack_require__(42);
 
 var _search_results = __webpack_require__(35);
 
-var _search_container = __webpack_require__(36);
+var _app_constants = __webpack_require__(13);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -896,33 +2154,70 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-/*
-class SearchComponent extends Component{
-    constructor(props){
-        super(props)
-        this.searchResultsRef=React.createRef()
-        this.resultsData=[]
+var host = _app_constants.constants.host;
+
+var SearchComponent = function (_Component) {
+    _inherits(SearchComponent, _Component);
+
+    function SearchComponent(props) {
+        _classCallCheck(this, SearchComponent);
+
+        var _this = _possibleConstructorReturn(this, (SearchComponent.__proto__ || Object.getPrototypeOf(SearchComponent)).call(this, props));
+
+        _this.resultsRef = _react2.default.createRef();
+        _this.query = '';
+        _this.withData = function (data) {
+            //build query 
+            var query = [];
+            var root = host + '?q=' + data.main.replace(/\s/g, '+');
+            if (data.advanced.open) {
+                var advanced = data.advanced;
+                for (var a in advanced) {
+                    if (a === 'open') {
+                        continue;
+                    } // migth have to add a meta-information space later. i don't like having no distinction between form element values and meta data
+                    if (advanced[a] !== '') {
+                        query.push(a + ':' + advanced[a]);
+                    }
+                }
+            }
+            _this.query = root + query.join(' ').replace(/\s/g, '+');
+
+            //and submit it to Search results.
+            _this.forceUpdate();
+        };
+        return _this;
     }
-    displayResults(data){//should come in with results from search
-        this.resultsData=data.items?data.items:[data]
-        this.forceUpdate()
-    }
-    render(){
-        return (
-            <SearchContainer>
-                <Search withQuery={this.displayResults.bind(this)}/>
-                <SearchResults 
-                    data={this.resultsData} 
-                    ref={this.searchResultsRef}
-                    {...this.props}
-                />
-            </SearchContainer>
-        )
-    }
-}
-*/
-var VolumeDetails = function (_Component) {
-    _inherits(VolumeDetails, _Component);
+
+    _createClass(SearchComponent, [{
+        key: 'render',
+        value: function render() {
+            return _react2.default.createElement(
+                _react2.default.Fragment,
+                null,
+                _react2.default.createElement(
+                    _Form.Form,
+                    { withData: this.withData },
+                    _react2.default.createElement(_search_box.SearchBox, { name: 'main', buildQuery: _search_box_build_queries.buildQuery, formatResponse: _search_box_build_queries.formatResponse }),
+                    _react2.default.createElement(
+                        _collapsible_flex_item.Collapsible,
+                        { title: 'advanced' },
+                        _react2.default.createElement(_search_box.SearchBox, { name: 'title', 'default': 'Hemmingway' }),
+                        _react2.default.createElement(_search_box.SearchBox, { name: 'author' }),
+                        _react2.default.createElement(_search_box.SearchBox, { name: 'publisher' })
+                    ),
+                    _react2.default.createElement(_Form.Go, null)
+                ),
+                _react2.default.createElement(_search_results.SearchResults, { ref: this.resultsRef, query: this.query })
+            );
+        }
+    }]);
+
+    return SearchComponent;
+}(_react.Component);
+
+var VolumeDetails = function (_Component2) {
+    _inherits(VolumeDetails, _Component2);
 
     function VolumeDetails(props) {
         _classCallCheck(this, VolumeDetails);
@@ -943,110 +2238,6 @@ var VolumeDetails = function (_Component) {
 
     return VolumeDetails;
 }(_react.Component);
-/*
-simply speaking, you'll render the details and the reader the same way
-but if allowed to render to the body, you'll append an element to the body, rendered in react, positioned absolutely, covering and with index set to be in front of anything else.
-
-*/
-
-
-var Element1 = function (_Component2) {
-    _inherits(Element1, _Component2);
-
-    function Element1(props) {
-        _classCallCheck(this, Element1);
-
-        var _this2 = _possibleConstructorReturn(this, (Element1.__proto__ || Object.getPrototypeOf(Element1)).call(this, props));
-
-        _this2.rendered = true;
-        return _this2;
-    }
-
-    _createClass(Element1, [{
-        key: 'render',
-        value: function render() {
-            return _react2.default.createElement(
-                'div',
-                null,
-                '1'
-            );
-        }
-    }]);
-
-    return Element1;
-}(_react.Component);
-
-var Element2 = function (_Component3) {
-    _inherits(Element2, _Component3);
-
-    function Element2(props) {
-        _classCallCheck(this, Element2);
-
-        var _this3 = _possibleConstructorReturn(this, (Element2.__proto__ || Object.getPrototypeOf(Element2)).call(this, props));
-
-        _this3.rendered = true;
-        return _this3;
-    }
-
-    _createClass(Element2, [{
-        key: 'render',
-        value: function render() {
-            return _react2.default.createElement(
-                'div',
-                null,
-                '2'
-            );
-        }
-    }]);
-
-    return Element2;
-}(_react.Component);
-
-var counter = 0;
-
-var SearchComponent = function (_Component4) {
-    _inherits(SearchComponent, _Component4);
-
-    function SearchComponent(props) {
-        _classCallCheck(this, SearchComponent);
-
-        return _possibleConstructorReturn(this, (SearchComponent.__proto__ || Object.getPrototypeOf(SearchComponent)).call(this, props));
-    }
-
-    _createClass(SearchComponent, [{
-        key: 'getRef',
-        value: function getRef() {
-            this[counter++] = _react2.default.createRef();
-            return this[counter++];
-        }
-    }, {
-        key: 'showRefs',
-        value: function showRefs() {
-            console.log(this[0].rendered);
-        }
-    }, {
-        key: 'render',
-        value: function render() {
-            return _react2.default.createElement(
-                'div',
-                null,
-                this.props.children.map(function (v) {
-                    //                    v.props.ref=this.getRef()
-                    console.log(v.ref);
-                    v.ref = _react2.default.createRef();
-                    return v;
-                }),
-                _react2.default.createElement(
-                    'div',
-                    { onClick: this.showRefs.bind(this) },
-                    'do it'
-                )
-            );
-        }
-    }]);
-
-    return SearchComponent;
-}(_react.Component);
 
 window.VolumesAPI = function () {
     this.container = document.querySelector('body');
@@ -1063,12 +2254,7 @@ window.VolumesAPI = function () {
             this.container = container;
         }
         //        ReactDom.render(<SearchComponent showDetails={this.showDetails.bind(this)}/>,this.container)
-        _reactDom2.default.render(_react2.default.createElement(
-            SearchComponent,
-            { showDetails: this.showDetails.bind(this) },
-            _react2.default.createElement(Element1, null),
-            _react2.default.createElement(Element2, null)
-        ), this.container);
+        _reactDom2.default.render(_react2.default.createElement(SearchComponent, null), this.container);
     };
     this.showDetails = function (data) {
         var useContainer = this.detailsContainment === 'fullCoverage' ? document.body : this.container;
@@ -20581,18 +21767,864 @@ function camelize(string) {
 module.exports = camelize;
 
 /***/ }),
-/* 29 */
+/* 29 */,
+/* 30 */
 /***/ (function(module, exports) {
 
-"use strict";
-throw new Error("Module build failed: Error: ENOENT: no such file or directory, open 'C:\\Users\\Owner\\web\\8thlight\\app\\src\\js\\search.js'");
+module.exports = function(module) {
+	if(!module.webpackPolyfill) {
+		module.deprecate = function() {};
+		module.paths = [];
+		// module.parent = undefined by default
+		if(!module.children) module.children = [];
+		Object.defineProperty(module, "loaded", {
+			enumerable: true,
+			get: function() {
+				return module.l;
+			}
+		});
+		Object.defineProperty(module, "id", {
+			enumerable: true,
+			get: function() {
+				return module.i;
+			}
+		});
+		module.webpackPolyfill = 1;
+	}
+	return module;
+};
+
 
 /***/ }),
-/* 30 */,
-/* 31 */,
-/* 32 */,
-/* 33 */,
-/* 34 */,
+/* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var ObjectAnimator = function ObjectAnimator() {
+  var _this = this;
+
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var animation = p.animation,
+      _p$conductor = p.conductor,
+      conductor = _p$conductor === undefined ? window.conductor : _p$conductor;
+
+  var regexes = {
+    realNumber: /-*\d+(\.+\d+)?/g,
+    numberMarker: /@@\d+/g
+  };
+  this.synchTransInc = false;
+  this.orig = {};this.dest = {};this.src = {};
+  this.fOrig = {}; //f stands for formatted
+  this.fDest = {};
+  this.contour = 'smooth';
+  this.duration = 500;
+  this.restoreDuration = function () {
+    return _this.duration = 500;
+  };
+  this.starttime = new Date().getTime();
+  this.desttime = new Date().getTime() + 1000;
+  this.offsettime = 0; //only during pause
+  this.interval = 30;
+  this.animHandle = '';
+  this.runningAnchor = false; //general activity. all statuses:preanim, preinc,inc,postinc and postanim, running =true
+  this.running = function () {
+    return _this.runningAnchor;
+  };
+  this.conductor = conductor;
+  this.preInc = [];this.postInc = [];this.preAnim = [];this.postAnim = [];
+
+  this.registerConductor = function (conductor) {
+    this.conductor = conductor;
+    return this;
+  };
+
+  this.animate = function () {
+    // call preanimation callbacks, set starttime & desttime, roll
+    this.runningAnchor = true;
+    for (var i = 0; i < this.preAnim.length; i++) {
+      this.preAnim[i]();
+    }
+    this.starttime = this.now();
+    this.desttime = this.starttime + this.duration;
+    this.startRoll();
+    return this;
+  };
+
+  this.stop = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var _p$pause = p.pause,
+        pause = _p$pause === undefined ? false : _p$pause,
+        _p$runPostAnim = p.runPostAnim,
+        runPostAnim = _p$runPostAnim === undefined ? true : _p$runPostAnim,
+        _p$jumpToDest = p.jumpToDest,
+        jumpToDest = _p$jumpToDest === undefined ? false : _p$jumpToDest;
+
+    clearTimeout(this.animHandle); //stop timeout,
+    if (pause) {
+      this.offsettime = this.now();runPostAnim = false;
+    }
+    if (jumpToDest) {
+      for (var i = 0; i < this.preInc.length; i++) {
+        this.preInc[i]();
+      } //run preInc calbacks
+      this.inc(this.fDest, this.src, this.fOrig, 1); //assign to dest, 
+      for (var i = 0; i < this.postInc.length; i++) {
+        this.postInc[i]();
+      } //run postInc calbacks
+    }
+    if (runPostAnim) {
+      for (var i = 0; i < this.postAnim.length; i++) {
+        this.postAnim[i]();
+      } //run postanimation calbacks
+    }
+    this.runningAnchor = false;
+    return this;
+  };
+
+  //////untested code
+
+  this.pause = function () {
+    this.stop({ pause: true });
+  }; //untested, not in spec
+
+  this.unPause = function () {
+    //untested, not in spec
+    var duration = this.now() - this.offsettime;
+    this.starttime += duration;
+    this.desttime += duration;
+    this.offsettime = 0;
+    this.runningAnchor = true;
+    this.startRoll();
+    return this;
+  };
+  //////end untested code
+  this.startRoll = function () {
+    if (this.conductor) {
+      this.conductor.register({ anim: this });
+    } else {
+      this.roll();
+    }
+  };
+
+  this.roll = function () {
+    var _this2 = this;
+
+    //self perpetuation, always delayed one iteration
+    if (this.running()) {
+      /*
+      requestAnimationFrame(()=>{
+        this.iterate()
+        this.roll()
+      })
+      /*/
+      this.animHandle = setTimeout(function () {
+        _this2.iterate();
+        _this2.roll(); //continue
+      }, Math.min(this.interval, this.desttime - this.now()));
+      //*/
+    }
+  };
+
+  this.iterate = function () {
+    //preInc
+    var perc = this.getProportion([this.starttime, this.desttime], this.now());
+    if (perc >= 1) {
+      this.stop({ jumpToDest: true });return;
+    }
+    for (var i = 0, len = this.preInc.length; i < len; i++) {
+      this.preInc[i]();
+    } //run preInc calbacks    
+    var prog = this.mapProgress(perc);
+    this.inc(this.fDest, this.src, this.fOrig, prog); //inc only does the setting of variables
+    for (var i = 0, len = this.postInc.length; i < len; i++) {
+      this.postInc[i]();
+    } //run postInc calbacks
+    return this;
+  };
+
+  this.update = function () {
+    //callable from outside, immediate update
+    this.iterate();
+    return this;
+  };
+
+  this.inc = function (dest, src, orig, perc) {
+    var _this3 = this;
+
+    var propagate = function propagate(dest, src, orig) {
+      for (var a in dest) {
+        if (dest[a].keeper === undefined) {
+          propagate(dest[a], src[a], orig[a]);
+        } else {
+          //dest prop is primitive. increment
+          //this is the anchor (hard coded animation)	
+          var finalValues = dest[a].val.map(function (n, i) {
+            var ret = perc === 1 ? dest[a].val[i] : orig[a].val[i] + (dest[a].val[i] - orig[a].val[i]) * perc;
+            return dest[a].round ? Math.round(ret) : ret;
+          }); //increment each value in the val array
+          var units = dest[a].units,
+              counter = 0;
+          //repackage values for the src
+          var setval = units === '' ? finalValues[0] : units.replace(regexes.numberMarker, function () {
+            return finalValues[counter++];
+          }); //if there is some string context, insert the numbers
+          if (a === 'transform' && _this3.synchTransInc) {
+            var holder = _this3.synchTransform({ orig: src[a], dest: setval });
+            setval = holder.dest;
+          }
+          src[a] = setval;
+        }
+      }
+    };
+    propagate(dest, src, orig);
+  };
+
+  this.mapProgress = function (perc) {
+    if (!perc) {
+      console.error('no percent animator.js, mapprogress()');
+    }
+    if (this.contour == 'linear') {
+      return perc;
+    }
+    if (this.contour == 'smooth-sine') {
+      return (Math.sin(-Math.PI / 2 + perc * Math.PI) + 1) / 2;
+    }
+    if (this.contour == 'smooth') {
+      var x = -1.57 + 3.14 * perc;
+      return Math.sin(x + Math.cos(x)) / 2 + .5;
+    }
+    if (this.contour == 'para') {
+      return perc * perc;
+    }
+    if (this.contour == 'root') {
+      return Math.sqrt(perc);
+    }
+    if (this.contour == 'cubed') {
+      return (Math.pow(-1 + 2 * perc, 3) + 1) / 2;
+    }
+    if (this.contour == 'boomerang') {
+      return perc + (Math.sin(-Math.PI / 2 + 2 * Math.PI * perc) + 1) / 2;
+    }
+  };
+
+  this.loadAnimation = function (p) {
+    //src,dest,orig,duration,preInc,postInc,preAnim,postAnim , assumes p is writable
+    //sets orig, dest and src for a new animation
+    //orig should only be submitted if src is not reflective of the current object status, like a style sheet (getcomputedstyle would fetch an appropriate orig parameter)
+    if (p.conductor) {
+      this.registerConductor(p.conductor);
+    }
+    this.preInc = [];this.postInc = [];this.preAnim = [];this.postAnim = [];this.fDest = {};this.fOrig = {};this.synchTransInc = false;
+    var err = this.validateAnimation(p);if (!err.status) {
+      console.error(err.message);return;
+    }
+    clearTimeout(this.animHandle);
+    if (!p.orig) {
+      p.orig = p.src;
+    }
+    Object.assign(this, p);
+    this.preInc = this.arrayWrap(this.preInc);
+    this.postInc = this.arrayWrap(this.postInc);
+    this.preAnim = this.arrayWrap(this.preAnim);
+    this.postAnim = this.arrayWrap(this.postAnim);
+    this.prepareAnimation(this.orig, this.dest, this.src, this.fOrig, this.fDest, p.stopProp);
+    return this;
+  };
+
+  this.safeParams = { stopProp: 1, synchTransInc: 1 };
+
+  this.validateAnimation = function (p) {
+    var valid = new this.Valid();
+    if (!p) {
+      valid.e('(no params)');
+    }
+    if (!p.src) {
+      valid.e('(no src)');
+    }
+    if (!p.dest) {
+      valid.e('(no dest)');
+    }
+
+    for (var k in p) {
+      if (this.safeParams[k]) {
+        continue;
+      }
+      if (!this[k]) {
+        delete p[k];console.log('invalid parameter:' + k);
+      } //conductor should be removed
+    }
+    return valid;
+  };
+
+  this.prepareAnimation = function (orig, dest, src, fOrig, fDest, stopProp) {
+    var _this4 = this;
+
+    if (!stopProp) {
+      var stopProp = {};
+    }
+    //stopProp should be a number of further propagation steps. 0 means don't even copy the value. 1 copy and move on, 2 copy and enter one level. 
+    //but right now, it is only equipped for 0 or 1 
+    var propagate = function propagate(orig, dest, src, fOrig, fDest, stopProp) {
+
+      for (var a in dest) {
+        //if props missing move right along
+        if (src[a] === undefined) {
+          continue;
+        }
+        if (orig[a] === undefined) {
+          continue;
+        }
+        //if this destination address is not primative, enter
+        if (dest[a] !== null && _typeof(dest[a]) === 'object') {
+          if (orig[a] !== null && _typeof(orig[a]) === 'object') {
+            if (src[a] !== null && _typeof(src[a]) === 'object') {
+              if (stopProp[a] !== undefined) {
+                if (stopProp[a] === 1) {
+                  src[a] = dest[a];
+                };continue;
+              }
+              if (dest[a].constructor === Array) {
+                fOrig[a] = [];fDest[a] = [];
+              } else {
+                fOrig[a] = {};fDest[a] = {};
+              }
+              propagate(orig[a], dest[a], src[a], fOrig[a], fDest[a], stopProp);
+            } else {
+              continue;
+            } //src prop not enterable
+          } else {
+            continue;
+          } //origprop not enterable
+        } else {
+          //dest prop is primitive.
+          if (orig[a] === undefined) {
+            continue;
+          } //missing prop
+          if (dest[a] === orig[a]) {
+            continue;
+          } //values are the same
+          var useOrig = orig[a],
+              useDest = dest[a];
+          if (a === 'transform') {
+            var synched = _this4.synchTransform({ orig: orig[a], dest: dest[a], synchTransInc: _this4.synchTransInc });
+            useOrig = synched.orig;
+            useDest = synched.dest;
+          }
+          var destVal = _this4.splitUnits(useDest);if (destVal == null) {
+            continue;
+          }
+          var origVal = _this4.splitUnits(useOrig);if (origVal == null) {
+            continue;
+          }
+          fDest[a] = {};
+          fOrig[a] = {};
+          Object.assign(fDest[a], destVal);
+          Object.assign(fOrig[a], origVal);
+        }
+      }
+    };
+    propagate(orig, dest, src, fOrig, fDest, stopProp);
+  };
+
+  this.synchTransform = ObjectAnimator.synchTransform;
+
+  this.splitUnits = function (elem, propName) {
+    //return {val,units,keeper} or null if not animatable 
+    var round = false;
+    if (typeof elem === 'number') {
+      return { val: [elem], units: '', keeper: true, round: round };
+    }
+    if (typeof elem === 'string') {
+      if (colours[elem]) {
+        elem = rgbaString(hexToRGBA(colours[elem]));round = true;
+      }
+      if (elem.match(/^#[a-zA-Z0-9]{3,6}$/)) {
+        elem = rgbaString(hexToRGBA(elem));round = true;
+      }
+      if (elem.indexOf('rgb') > -1) {
+        elem = makeSureRGBA(elem);round = true;
+      }
+      var val = elem.match(regexes.realNumber); //if there is a number, increment it
+      var counter = 0;
+      return val === null ? val : {
+        val: val.map(function (v) {
+          return Number(v);
+        }),
+        units: elem.replace(regexes.realNumber, function () {
+          return '@@' + counter++;
+        }), keeper: true, round: round };
+    }
+    return null;
+  };
+
+  this.Valid = function () {
+    this.status = true;this.message = '';
+    this.e = function (message) {
+      this.status = false, this.message += '(' + message + ')';
+    };
+  };
+
+  this.now = function () {
+    return new Date().getTime();
+  };
+
+  this.getProportion = function (range, value) {
+    return (value - Math.min(range[0], range[1])) / Math.abs(range[1] - range[0]);
+  };
+
+  this.arrayWrap = function (thing) {
+    if (Object.prototype.toString.call(thing) !== '[object Array]') {
+      return [thing];
+    } else {
+      return thing;
+    }
+  };
+
+  this.anim = function (anim) {
+    this.loadAnimation(anim);
+    this.animate();
+    return this;
+  };
+
+  this.getShortHand = function () {
+    return function () {
+      var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+      return new ObjectAnimator().loadAnimation(p).animate();
+    };
+  };
+
+  if (animation) {
+    if (animation.dest) {
+      this.loadAnimation(animation);
+    }
+    if (animation.conductor) {
+      this.registerConductor(animation.conductor);
+    }
+  }
+
+  if (conductor) {
+    this.registerConductor(conductor);
+  }
+};
+
+if (!window.anim) {
+  window.anim = function () {
+    var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    return new ObjectAnimator().loadAnimation(p).animate();
+  };
+}
+
+ObjectAnimator.setConductor = function (conductor) {
+  ObjectAnimator.prototype.conductor = conductor;
+};
+
+ObjectAnimator.removeConductor = function (conductor) {
+  ObjectAnimator.prototype.conductor = undefined;
+};
+
+ObjectAnimator.synchTransform = function () {
+  var p = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  //orig and dest should be strings
+  var orig = p.orig,
+      dest = p.dest,
+      _p$synchTransInc = p.synchTransInc,
+      synchTransInc = _p$synchTransInc === undefined ? false : _p$synchTransInc,
+      origArray = [],
+      destArray = [],
+      origU = new Map(),
+      destU = new Map(),
+      origVal;
+
+  var breakOrig = orig.match(/[a-zA-Z]+\([^\)]*\)/g),
+      breakDest = dest.match(/[a-zA-Z]+\([^\)]*\)/g);
+  if (breakOrig) {
+    breakOrig.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');origU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakOrig = [];
+  }
+  if (breakDest) {
+    breakDest.forEach(function (val, i) {
+      val = val.replace(/\s/g, '');destU.set(val.split('(')[0], val);
+    });
+  } else {
+    breakDest = [];
+  }
+  if (!synchTransInc) {
+    origU.forEach(function (v, k) {
+      destArray.push(destU.has(k) ? destU.get(k) : origU.get(k));
+      origArray.push(origU.get(k));
+      destU.delete(k);
+    });
+  }
+  destU.forEach(function (v, k) {
+    destArray.push(destU.get(k));
+    origArray.push(origU.has(k) ? origU.get(k) : transformDefaultTable[k]);
+  });
+  return { orig: origArray.join(' '), dest: destArray.join(' ') };
+};
+
+var transformDefaultTable = {
+  translate: 'translate(0,0)',
+  translate3d: 'translate3d(0,0,0)',
+  translateX: 'translateX(0)',
+  translateY: 'translateY(0)',
+  translateZ: 'translateZ(0)',
+  scale: 'scale(1,1)',
+  scale3d: 'scale3d(1,1,1)',
+  scaleX: 'scaleX(1)',
+  scaleY: 'scaleY(1)',
+  scaleZ: 'scaleZ(1)',
+  rotate: 'rotate(0deg)',
+  rotate3d: 'rotate3d(0,0,0,0deg)',
+  rotateX: 'rotateX(0deg)',
+  rotateY: 'rotateY(0deg)',
+  rotateZ: 'rotateZ(0deg)',
+  skew: 'skew(0deg,0deg)',
+  skewX: 'skewX(0deg)',
+  skewY: 'skewY(0deg)',
+  perspective: 'perspective(1000000px)'
+};
+
+var colours = { "aliceblue": "#f0f8ff", "antiquewhite": "#faebd7", "aqua": "#00ffff", "aquamarine": "#7fffd4", "azure": "#f0ffff",
+  "beige": "#f5f5dc", "bisque": "#ffe4c4", "black": "#000000", "blanchedalmond": "#ffebcd", "blue": "#0000ff", "blueviolet": "#8a2be2", "brown": "#a52a2a", "burlywood": "#deb887",
+  "cadetblue": "#5f9ea0", "chartreuse": "#7fff00", "chocolate": "#d2691e", "coral": "#ff7f50", "cornflowerblue": "#6495ed", "cornsilk": "#fff8dc", "crimson": "#dc143c", "cyan": "#00ffff",
+  "darkblue": "#00008b", "darkcyan": "#008b8b", "darkgoldenrod": "#b8860b", "darkgray": "#a9a9a9", "darkgreen": "#006400", "darkkhaki": "#bdb76b", "darkmagenta": "#8b008b", "darkolivegreen": "#556b2f",
+  "darkorange": "#ff8c00", "darkorchid": "#9932cc", "darkred": "#8b0000", "darksalmon": "#e9967a", "darkseagreen": "#8fbc8f", "darkslateblue": "#483d8b", "darkslategray": "#2f4f4f", "darkturquoise": "#00ced1",
+  "darkviolet": "#9400d3", "deeppink": "#ff1493", "deepskyblue": "#00bfff", "dimgray": "#696969", "dodgerblue": "#1e90ff",
+  "firebrick": "#b22222", "floralwhite": "#fffaf0", "forestgreen": "#228b22", "fuchsia": "#ff00ff",
+  "gainsboro": "#dcdcdc", "ghostwhite": "#f8f8ff", "gold": "#ffd700", "goldenrod": "#daa520", "gray": "#808080", "green": "#008000", "greenyellow": "#adff2f",
+  "honeydew": "#f0fff0", "hotpink": "#ff69b4",
+  "indianred ": "#cd5c5c", "indigo": "#4b0082", "ivory": "#fffff0", "khaki": "#f0e68c",
+  "lavender": "#e6e6fa", "lavenderblush": "#fff0f5", "lawngreen": "#7cfc00", "lemonchiffon": "#fffacd", "lightblue": "#add8e6", "lightcoral": "#f08080", "lightcyan": "#e0ffff", "lightgoldenrodyellow": "#fafad2",
+  "lightgrey": "#d3d3d3", "lightgreen": "#90ee90", "lightpink": "#ffb6c1", "lightsalmon": "#ffa07a", "lightseagreen": "#20b2aa", "lightskyblue": "#87cefa", "lightslategray": "#778899", "lightsteelblue": "#b0c4de",
+  "lightyellow": "#ffffe0", "lime": "#00ff00", "limegreen": "#32cd32", "linen": "#faf0e6",
+  "magenta": "#ff00ff", "maroon": "#800000", "mediumaquamarine": "#66cdaa", "mediumblue": "#0000cd", "mediumorchid": "#ba55d3", "mediumpurple": "#9370d8", "mediumseagreen": "#3cb371", "mediumslateblue": "#7b68ee",
+  "mediumspringgreen": "#00fa9a", "mediumturquoise": "#48d1cc", "mediumvioletred": "#c71585", "midnightblue": "#191970", "mintcream": "#f5fffa", "mistyrose": "#ffe4e1", "moccasin": "#ffe4b5",
+  "navajowhite": "#ffdead", "navy": "#000080",
+  "oldlace": "#fdf5e6", "olive": "#808000", "olivedrab": "#6b8e23", "orange": "#ffa500", "orangered": "#ff4500", "orchid": "#da70d6",
+  "palegoldenrod": "#eee8aa", "palegreen": "#98fb98", "paleturquoise": "#afeeee", "palevioletred": "#d87093", "papayawhip": "#ffefd5", "peachpuff": "#ffdab9", "peru": "#cd853f", "pink": "#ffc0cb", "plum": "#dda0dd", "powderblue": "#b0e0e6", "purple": "#800080",
+  "rebeccapurple": "#663399", "red": "#ff0000", "rosybrown": "#bc8f8f", "royalblue": "#4169e1",
+  "saddlebrown": "#8b4513", "salmon": "#fa8072", "sandybrown": "#f4a460", "seagreen": "#2e8b57", "seashell": "#fff5ee", "sienna": "#a0522d", "silver": "#c0c0c0", "skyblue": "#87ceeb", "slateblue": "#6a5acd", "slategray": "#708090", "snow": "#fffafa", "springgreen": "#00ff7f", "steelblue": "#4682b4",
+  "tan": "#d2b48c", "teal": "#008080", "thistle": "#d8bfd8", "tomato": "#ff6347", "turquoise": "#40e0d0",
+  "violet": "#ee82ee",
+  "wheat": "#f5deb3", "white": "#ffffff", "whitesmoke": "#f5f5f5",
+  "yellow": "#ffff00", "yellowgreen": "#9acd32" };
+
+var hexToRGBA = function hexToRGBA(hex) {
+  "use strict";
+
+  if (hex.charAt(0) === '#') {
+    hex = hex.substr(1);
+  }
+  if (hex.length < 2 || hex.length > 6) {
+    return false;
+  }
+  var values = hex.split(''),
+      r,
+      g,
+      b;
+
+  if (hex.length === 2) {
+    r = parseInt(values[0].toString() + values[1].toString(), 16);
+    g = r;
+    b = r;
+  } else if (hex.length === 3) {
+    r = parseInt(values[0].toString() + values[0].toString(), 16);
+    g = parseInt(values[1].toString() + values[1].toString(), 16);
+    b = parseInt(values[2].toString() + values[2].toString(), 16);
+  } else if (hex.length === 6) {
+    r = parseInt(values[0].toString() + values[1].toString(), 16);
+    g = parseInt(values[2].toString() + values[3].toString(), 16);
+    b = parseInt(values[4].toString() + values[5].toString(), 16);
+  } else {
+    return false;
+  }
+  return { r: r, g: g, b: b, a: 1
+    //return [r, g, b];		
+  };
+};
+var makeSureRGBA = function makeSureRGBA(rgba) {
+  if (rgba.indexOf('rgba') > -1) {
+    return rgba;
+  }
+  //rgb(255,255,255)
+  rgba = rgba.replace('rgb', 'rgba');
+  rgba = rgba.replace('rgbaa', 'rgba');
+  var holder = rgba.split(')');
+  return holder[0] + ',1)';
+};
+var rgbaString = function rgbaString(rgba) {
+  if ((typeof rgba === 'undefined' ? 'undefined' : _typeof(rgba)) === 'object') {
+    return 'rgba(' + rgba['r'] + ',' + rgba['g'] + ',' + rgba['b'] + ',' + rgba['a'] + ')';
+  }
+  if (rgba.constructor === Array) {
+    return 'rgba(' + rgba.join(',') + ')';
+  }
+};
+
+exports.ObjectAnimator = ObjectAnimator;
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.SearchBox = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _get_from_server = __webpack_require__(14);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var getFromServer = (0, _get_from_server.getFromServerThrottled)(); //returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
+
+var SearchBox = exports.SearchBox = function (_Component) {
+    _inherits(SearchBox, _Component);
+
+    function SearchBox(props) {
+        _classCallCheck(this, SearchBox);
+
+        var _this = _possibleConstructorReturn(this, (SearchBox.__proto__ || Object.getPrototypeOf(SearchBox)).call(this, props)); //label, default, buildQuery formatResponse, postChoose <-- return fetch ready arguments
+
+
+        _this.searchRef = _react2.default.createRef();
+
+        _this.label = function () {
+            return _this.props.label || '';
+        };
+        _this.name = function () {
+            return _this.props.name || function () {
+                throw error('no name in SearchBox component');
+            };
+        };
+        _this.emptyVal = function () {
+            return _this.props.default || '';
+        };
+        _this.buildQuery = function () {
+            return _this.props.buildQuery;
+        }; // function for building the query argument for fetch
+        // function for formatting the response from the server, final result should have the format :  [{value,content},{value2,content2}] where value is a string and content is jsx content
+        _this.formatResponse = function () {
+            return _this.props.formatResponse || function (v) {
+                return v;
+            };
+        };
+        _this.postChoose = function () {
+            return _this.props.postChoose || function () {};
+        };
+
+        _this.autoData = null; //autocomplete server responses go here. formatResponse and get choices unpack it.  
+        return _this;
+    }
+
+    _createClass(SearchBox, [{
+        key: 'getValue',
+        value: function getValue() {
+            //method for parents to retrieve value
+            var value = this.searchRef.current.value;
+            return value === this.emptyVal() ? '' : value;
+        }
+    }, {
+        key: 'handleDefaultText',
+        value: function handleDefaultText(e) {
+            //clear if focused when empty, put default text if blurred when empty
+            var input = this.searchRef.current;
+            var value = input.value;
+            if (e.type === 'blur' && value === '') {
+                input.value = this.emptyVal();
+            }
+            if (e.type === 'focus' && value === this.emptyVal()) {
+                input.value = '';
+            }
+        }
+    }, {
+        key: 'autoComplete',
+        value: function autoComplete() {
+            var _this2 = this;
+
+            //   getFromServer unpacks a param object {query , data , withResult=()=>{}, noSuccess=()=>{}, getType='json'}=par
+            if (!this.buildQuery() || !this.searchRef.current) {
+                return;
+            }
+            var pack = Object.assign(this.buildQuery()(this.searchRef.current), {
+                withResult: function withResult(result) {
+                    _this2.autoData = result;
+                    _this2.forceUpdate();
+                }
+            });
+            getFromServer(pack);
+        }
+        //each item should have format [{value,content},{value2,content2}]
+
+    }, {
+        key: 'getChoices',
+        value: function getChoices() {
+            var _this3 = this;
+
+            //should be called inside render
+            if (this.autoData === null) {
+                return _react2.default.createElement('span', null);
+            }
+            var formattedData = this.formatResponse()(this.autoData);
+            var choices = formattedData.map(function (v) {
+                return _react2.default.createElement(
+                    'div',
+                    { onClick: _this3.makeChoice.bind(_this3, v), name: 'autoCompleteChoice', 'data-choice': v.value },
+                    ' ',
+                    v.content,
+                    ' '
+                );
+            });
+            return choices;
+        }
+    }, {
+        key: 'makeChoice',
+        value: function makeChoice(choice) {
+            //clear choices
+            this.autoData = null;
+            //set the main value
+            this.searchRef.current.value = choice.value;
+            //rerender
+            this.forceUpdate();
+            //call postChoose
+            this.postChoose()(choice);
+        }
+    }, {
+        key: 'componentDidMount',
+        value: function componentDidMount() {
+            var _this4 = this;
+
+            var events = ['blur', 'focus'],
+                input = this.searchRef.current;
+            events.forEach(function (v) {
+                input.addEventListener(v, _this4.handleDefaultText.bind(_this4));
+            });
+            input.addEventListener('keyup', this.autoComplete.bind(this));
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            return _react2.default.createElement(
+                'div',
+                null,
+                this.props.label || '',
+                _react2.default.createElement('input', { ref: this.searchRef, name: this.name(), defaultValue: this.emptyVal() }),
+                this.getChoices()
+            );
+        }
+    }]);
+
+    return SearchBox;
+}(_react.Component);
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+var throttleFunc = exports.throttleFunc = function throttleFunc(func) {
+    var thresh = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 200;
+
+    var handle = 'stopped';
+    return function () {
+        var _arguments = arguments;
+
+        if (handle !== 'stopped') {
+            clearInterval(handle);
+        }
+        handle = setTimeout(function () {
+            func.apply(undefined, _arguments);handle = 'stopped';
+        }, thresh);
+    };
+};
+
+/***/ }),
+/* 34 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.formatResponse = exports.buildQuery = undefined;
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _app_constants = __webpack_require__(13);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var host = _app_constants.constants.host;
+var buildQuery = exports.buildQuery = function buildQuery(input) {
+    return { query: host + '?q=' + input.value.replace(/\s/g, '+') };
+};
+
+var formatResponse = exports.formatResponse = function formatResponse(response) {
+    return response.items.map(function (v) {
+        var info = v.volumeInfo;
+        return {
+            value: info.title,
+            content: _react2.default.createElement(
+                _react2.default.Fragment,
+                null,
+                _react2.default.createElement(
+                    'div',
+                    null,
+                    info.title
+                ),
+                _react2.default.createElement(
+                    'div',
+                    null,
+                    info.subtitle
+                ),
+                _react2.default.createElement(
+                    'div',
+                    null,
+                    info.authors.join(', ')
+                )
+            )
+        };
+    });
+};
+
+/***/ }),
 /* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -20610,6 +22642,16 @@ var _react = __webpack_require__(0);
 
 var _react2 = _interopRequireDefault(_react);
 
+var _get_from_server = __webpack_require__(14);
+
+var _reactPaginate = __webpack_require__(44);
+
+var _reactPaginate2 = _interopRequireDefault(_reactPaginate);
+
+var _paginator = __webpack_require__(51);
+
+var _paginator2 = _interopRequireDefault(_paginator);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -20618,46 +22660,177 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+/* *gibberish decision: whether or not google's rejection is because the search terms were gibberish (there really are no results) or the page number was exceeded
+*/
+var getFromServer = (0, _get_from_server.getFromServerThrottled)(); //returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
+
 var SearchResults = exports.SearchResults = function (_Component) {
     _inherits(SearchResults, _Component);
 
     function SearchResults(props) {
         _classCallCheck(this, SearchResults);
 
-        return _possibleConstructorReturn(this, (SearchResults.__proto__ || Object.getPrototypeOf(SearchResults)).call(this, props));
+        var _this = _possibleConstructorReturn(this, (SearchResults.__proto__ || Object.getPrototypeOf(SearchResults)).call(this, props));
+
+        _this.query = '';
+        _this.resultsPerPage = 20;
+        _this.pagesShown = 10;
+        _this.paginator = new _paginator2.default(_this.resultsPerPage, _this.pagesShown);
+        _this.makePages = function () {
+            var totalResults = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+            var page = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+
+            _this.pageStatus = _this.paginator.build(totalResults, page);
+        };
+        _this.makePages();
+        _this.result = null;
+        _this.status = 'ready'; //fetching, ready  
+        _this.changePage = function (page) {
+            if (_this.status !== 'ready') {
+                return;
+            }
+            _this.makePages(_this.pageStatus.total_results, page.selected);
+            _this.getResult();
+        };
+
+        /*
+          on instantiation, there is no result
+        you have to get a result on update, so as not to interfere with the initial render.
+        onmount, 
+          paginator and paginate...
+          paginate should be rendered with different props when the query changes
+            stateVars:
+        query
+        pagenumber
+        status
+        on receiving a new query prop, if it is different, the page will be reset to 1. otherwise, the component should not update
+          changes in 
+            the query prop
+                resets the page to 0
+            the page
+                only resets the page
+        
+        cause the fetching status to take into effect
+        */
+
+        return _this;
     }
 
     _createClass(SearchResults, [{
-        key: 'render',
-        value: function render() {
+        key: 'buildQuery',
+        value: function buildQuery() {
+            //for now handles pages. takes the page requested and calculates tbe start index and adds it to the query
+            return this.query + '&startIndex=' + this.resultsPerPage * this.pageStatus.current_page + "&maxResults=" + this.resultsPerPage;
+        }
+    }, {
+        key: 'getResult',
+        value: function getResult() {
             var _this2 = this;
 
-            console.log({ props: this.props });
-            var data = this.props.data || [];
-            var formatItem = function formatItem(v) {
-                var volume = v.volumeInfo;
-                return _react2.default.createElement(
+            var page = this.pageStatus.page_number; //store the pagenumber for the gibberish decision*
+            var pack = {
+                query: this.buildQuery(),
+                withResult: function withResult(result) {
+                    _this2.resolve.call(_this2, result, page);
+                },
+                noSuccess: function noSuccess(result) {
+                    _this2.resolve.call(_this2, result, page);
+                }
+            };
+            this.status = 'fetching';
+            getFromServer(pack);
+            this.forceUpdate();
+        }
+    }, {
+        key: 'resolve',
+        value: function resolve(result, page) {
+            // resolve is called with the same page setting  
+            this.status = 'ready';
+            /*
+            cases
+                successful terms and pagenumber
+                gibberish terms, and there really are no results (fail or no result with page=0 request)
+                pagenumber exeeded
+            */
+            if (!result.status && result.items && result.items instanceof Array) {
+                //if successful, the result should be extracted
+                this.result = result;
+                this.makePages(result.totalItems, this.pageStatus.current_page); //revise total pages based on results. (freezing requests during fetch is not decided at the time of this comment.)
+            } else if (page === 0) {
+                //if the search terms were gibberish
+                this.result = null;
+                this.makePages();
+            }
+            //all other cases should do nothing
+            this.forceUpdate();
+        }
+    }, {
+        key: 'componentDidUpdate',
+        value: function componentDidUpdate() {
+            //the only thing the outside should be responsible for is the query
+            if (this.props.query !== this.query) {
+                this.makePages(); //resets pages and num results to 0
+                this.query = this.props.query;
+                this.status = 'fetching';
+                this.forceUpdate();
+                this.getResult();
+            }
+        }
+    }, {
+        key: 'formatItem',
+        value: function formatItem(v) {
+            var volume = v.volumeInfo;
+            return _react2.default.createElement(
+                'div',
+                null,
+                _react2.default.createElement(
                     'div',
                     null,
-                    _react2.default.createElement(
-                        'div',
-                        null,
-                        volume.title
-                    ),
-                    _react2.default.createElement(
-                        'div',
-                        null,
-                        volume.authors.join(', ')
-                    ),
-                    _react2.default.createElement(
-                        'div',
-                        { onClick: _this2.props.showDetails || function () {} },
-                        'More Info'
-                    )
+                    volume.title
+                ),
+                _react2.default.createElement(
+                    'div',
+                    null,
+                    volume.authors.join(', ')
+                ),
+                _react2.default.createElement(
+                    'div',
+                    { onClick: this.props.showDetails || function () {} },
+                    'More Info'
+                )
+            );
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            //you can check here if the state is different from the props
+            if (this.status === 'fetching') {
+                return _react2.default.createElement(
+                    'span',
+                    null,
+                    'Getting Results'
                 );
-            };
-            //console.log({data:data.map(formatItem)})
-            return data.map(formatItem);
+            }
+            if (this.pageStatus.total_results === 0) {
+                return _react2.default.createElement(
+                    'span',
+                    null,
+                    'No Results'
+                );
+            }
+            var ps = this.pageStatus;
+            return _react2.default.createElement(
+                _react2.default.Fragment,
+                null,
+                _react2.default.createElement(_reactPaginate2.default, {
+                    pageCount: ps.total_pages,
+                    pageRangeDisplayed: this.pagesShown,
+                    MarginPagesDisplayed: 4,
+                    forcePage: ps.current_page,
+                    onPageChange: this.changePage
+                }),
+                (this.result.items || []).map(this.formatItem.bind(this))
+            );
         }
     }]);
 
@@ -20665,13 +22838,7 @@ var SearchResults = exports.SearchResults = function (_Component) {
 }(_react.Component);
 
 /***/ }),
-/* 36 */
-/***/ (function(module, exports) {
-
-"use strict";
-throw new Error("Module build failed: Error: ENOENT: no such file or directory, open 'C:\\Users\\Owner\\web\\8thlight\\app\\src\\js\\search_container.js'");
-
-/***/ }),
+/* 36 */,
 /* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -20711,7 +22878,7 @@ exports = module.exports = __webpack_require__(39)(undefined);
 
 
 // module
-exports.push([module.i, "/*\r\nmodifier--\r\nelement__\r\n*/\nbody, .cover {\n  position: absolute;\n  height: 100%;\n  width: 100%; }\n\nhtml, body {\n  margin: 0;\n  overflow: hidden; }\n  html body, body body {\n    background-color: #444; }\n\n.button {\n  box-shadow: 0px 2px 2px;\n  font-size: 1.3em;\n  border: radius 0.2em; }\n  .button--regular {\n    color: white;\n    background-image: linear-gradient(30deg, #3c501b 10%, #267257 20%); }\n\n/*\r\nalright, an app component is to be inserted inside a display-flex container.\r\n    if you set the flex basis of the component to content, then you can expand and contract the content window...\r\n    what to do if a row/column is too long? I think there's a no wrap property somewhere that may help\r\n\r\n*/\n.flex {\n  display: flex; }\n\n.flush {\n  margin: 0px; }\n\n.canvasAndPlayerContainer {\n  flex-grow: 5;\n  display: flex;\n  flex-direction: column; }\n", ""]);
+exports.push([module.i, "/*\r\nmodifier--\r\nelement__\r\n*/\nbody, .cover {\n  position: absolute;\n  height: 100%;\n  width: 100%; }\n\nhtml, body {\n  margin: 0; }\n  html body, body body {\n    background-color: #444; }\n\n.button {\n  box-shadow: 0px 2px 2px;\n  font-size: 1.3em;\n  border: radius 0.2em; }\n  .button--regular {\n    color: white;\n    background-image: linear-gradient(30deg, #3c501b 10%, #267257 20%); }\n\n/*\r\nalright, an app component is to be inserted inside a display-flex container.\r\n    if you set the flex basis of the component to content, then you can expand and contract the content window...\r\n    what to do if a row/column is too long? I think there's a no wrap property somewhere that may help\r\n\r\n*/\n.flex {\n  display: flex; }\n\n.flush {\n  margin: 0px; }\n\n.canvasAndPlayerContainer {\n  flex-grow: 5;\n  display: flex;\n  flex-direction: column; }\n", ""]);
 
 // exports
 
@@ -21262,6 +23429,1542 @@ module.exports = function (css) {
 
 	// send back the fixed css
 	return fixedCss;
+};
+
+
+/***/ }),
+/* 42 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.Collapsible = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _queue = __webpack_require__(12);
+
+var _animator = __webpack_require__(31);
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _reactDom = __webpack_require__(20);
+
+var _reactDom2 = _interopRequireDefault(_reactDom);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; } /*
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 *these items are intended for a flexbox. 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 *they set themsleves with margin 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 *they animate their collapse by animating the flex grow  and min width values 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 *props
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   orientation 'vertical',horizontal
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   reverse
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   title default expand collapse
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   if no orientation is present it will look on the parents getcomputed style for the flexDirection prop and orient itself based on that
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               */
+
+
+var animator = new _animator.ObjectAnimator();
+var verticalizeText = function verticalizeText() {
+    var text = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+
+    return _react2.default.createElement(
+        'div',
+        null,
+        text.split('').map(function (v) {
+            return _react2.default.createElement(
+                'div',
+                null,
+                v
+            );
+        })
+    );
+};
+var queue = new _queue.Queue();
+
+var Collapsible = exports.Collapsible = function (_Component) {
+    _inherits(Collapsible, _Component);
+
+    function Collapsible(props) {
+        _classCallCheck(this, Collapsible);
+
+        var _this = _possibleConstructorReturn(this, (Collapsible.__proto__ || Object.getPrototypeOf(Collapsible)).call(this, props)); //title, ,orientation(vertical means collapses vertically or hor.), reverse
+
+
+        _this.open = _this.props.open !== undefined ? _this.props.open : true;
+        _this.wrapperStyle = { flexGrow: _this.open ? _this.props.grow !== undefined ? _this.props.grow : 1 : 0
+        };
+        _this.contentStyle = { flexGrow: 1, opacity: 1 };
+        _this.buttonStyle = { flexDirection: 'row' };
+        _this.wrapper = _react2.default.createRef();
+        _this.content = _react2.default.createRef();
+
+        _this.getWrapperClass = function () {
+            return _this.props.wrapperClass || 'appComponent';
+        };
+        return _this;
+    }
+
+    _createClass(Collapsible, [{
+        key: 'determineWidthAndHeight',
+        value: function determineWidthAndHeight(direction) {
+            if (!direction) {
+                var direction = this.getDirection();
+            }
+            var width = 'auto',
+                height = 'auto';
+            if (!this.open) {
+                var direction = this.getDirection();
+                if (direction.indexOf('row') != -1) {
+                    width = 0;
+                } else {
+                    height = 0;
+                }
+            }
+            return { width: width, height: height };
+        }
+    }, {
+        key: 'toggle',
+        value: function toggle() {
+            var _this2 = this;
+
+            this.open = !this.open;
+            var direction = this.getDirection();
+            var widthAndHeight = this.determineWidthAndHeight(direction);
+            var flexGrow = this.open ? this.props.grow !== undefined ? this.props.grow : 1 : 0;
+
+            var opacity = this.open ? 1 : 0;
+
+            queue.interrupt().clear().add(function () {
+                _this2.contentStyle.opacity = opacity;
+                _this2.forceUpdate();
+            }).wait(300).add(function () {
+                _this2.wrapperStyle.flexGrow = flexGrow;
+                Object.assign(_this2.contentStyle, { flexGrow: flexGrow }, widthAndHeight);
+                _this2.forceUpdate();
+            });
+
+            //if opening, reverse the queue
+            if (this.open) {
+                var line = queue.slice().reverse();
+                queue.clear().add(line);
+            }
+            queue.kickStart();
+        }
+    }, {
+        key: 'getDirection',
+        value: function getDirection() {
+            var direction = !this.props.orientation && this.wrapper.current ? getComputedStyle(this.wrapper.current.parentNode).flexDirection : this.props.orientation === 'vertical' ? 'column' : 'row';
+
+            direction += this.props.reverse ? '-reverse' : '';
+            return direction;
+        }
+    }, {
+        key: 'componentDidMount',
+        value: function componentDidMount() {
+            //can't really know the orientation till the first render
+            var widthAndHeight = this.determineWidthAndHeight();
+            Object.assign(this.contentStyle, widthAndHeight);
+            this.forceUpdate();
+        }
+    }, {
+        key: 'componentDidUpdate',
+        value: function componentDidUpdate() {
+            this.wrapper.current.reactHandle = { construct: Collapsible, instance: this };
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            var direction = this.getDirection();
+
+            var title = this.props.title || (this.open ? 'collapse' : 'expand');
+            title = direction.indexOf('row') != -1 ? verticalizeText(title) : title;
+
+            this.wrapperStyle.flexDirection = direction;
+            this.buttonStyle.flexDirection = direction === 'row' ? 'column' : 'row';
+
+            return _react2.default.createElement(
+                'div',
+                { ref: this.wrapper, className: this.getWrapperClass(), style: Object.assign({}, this.wrapperStyle) },
+                _react2.default.createElement(
+                    'div',
+                    { onClick: this.toggle.bind(this), togglecomponent: 'true', style: Object.assign({}, this.buttonStyle) },
+                    title
+                ),
+                _react2.default.createElement(
+                    'div',
+                    { ref: this.content, style: Object.assign({}, this.contentStyle) },
+                    this.props.children
+                )
+            );
+        }
+    }]);
+
+    return Collapsible;
+}(_react.Component);
+
+/***/ }),
+/* 43 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.Go = exports.Form = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _queue = __webpack_require__(12);
+
+var _collapsible_flex_item = __webpack_require__(42);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var collectData = function collectData(domNode) {
+    //should be a formNode
+    //make a registry of the elements in the form to check and see if the node we're visiting is a form element or not. 
+    var elementRegistry = new Map(); //
+    for (var a in domNode.elements) {
+        elementRegistry.set(domNode.elements[a], 1);
+    }
+
+    //we still have to propagate because we need to know whether the which fields go in what sections and which sections have been disabled or not 
+    var sections = [],
+        data = {};
+    var pointer = data;
+    var propagate = function propagate(node) {
+        for (var _a in node.children || {}) {
+            var child = node.children[_a];
+            if (elementRegistry.has(child) && child.getAttribute) {
+                //of course other retrieval methods would have to be added if the form is extended
+                var name = child.getAttribute('name');
+                if (name) {
+                    pointer[name] = child.value;
+                    if (child.getAttribute('type') === 'checkbox') {
+                        pointer[name] = child.getAttribute('checked');
+                    }
+                }
+            }
+            if (child.reactHandle && child.reactHandle.construct === _collapsible_flex_item.Collapsible) {
+                var instance = child.reactHandle.instance;
+                var title = instance.props.title;
+                pointer[title] = { open: instance.open };
+                pointer = pointer[title];
+                sections.push[pointer];
+            }
+            propagate(child);
+            if (child.reactHandle && child.reactHandle.construct === _collapsible_flex_item.Collapsible) {
+                sections.pop();
+                pointer = sections[sections.length - 1] || data;
+            }
+        }
+    };
+    propagate(domNode);
+    return data;
+};
+var findPapa = function findPapa(node) {
+    var targetType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : Form;
+
+    var test = node;
+    var stop = document.querySelector('body');
+    while (test !== stop) {
+        if (test.reactHandle && test.reactHandle.construct === targetType) {
+            return test;
+        }
+        test = test.parentNode;
+    }
+};
+
+var Form = exports.Form = function (_Component) {
+    _inherits(Form, _Component);
+
+    //fields takes an array of an array of fields
+    function Form(props) {
+        _classCallCheck(this, Form);
+
+        var _this = _possibleConstructorReturn(this, (Form.__proto__ || Object.getPrototypeOf(Form)).call(this, props));
+
+        _this.formRef = _react2.default.createRef();
+        _this.getWithData = function () {
+            // 
+            return _this.props.withData || function () {
+                return console.error("called 'Go' with no withData function");
+            };
+        };
+
+        _this.submitData = function () {
+            var data = collectData(_this.formRef.current);
+            _this.getWithData()(data);
+        };
+        return _this;
+    }
+
+    _createClass(Form, [{
+        key: 'makeTrace',
+        value: function makeTrace() {
+            this.formRef.current.reactHandle = { construct: Form, instance: this };
+        }
+    }, {
+        key: 'componentDidUpdate',
+        value: function componentDidUpdate() {
+            this.makeTrace();
+        }
+    }, {
+        key: 'componentDidMount',
+        value: function componentDidMount() {
+            this.makeTrace();
+            this.formRef.current.onsubmit = function () {
+                return false;
+            };
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            //the Go button can be place anywhere in the component but needs to 
+            return _react2.default.createElement(
+                _react2.default.Fragment,
+                null,
+                _react2.default.createElement(
+                    'form',
+                    { ref: this.formRef },
+                    this.props.children || _react2.default.createElement('span', null)
+                )
+            );
+        }
+    }]);
+
+    return Form;
+}(_react.Component);
+
+//activates finds the form node above it and activates with
+
+
+var Go = exports.Go = function (_Component2) {
+    _inherits(Go, _Component2);
+
+    //fields takes an array of an array of fields
+    function Go(props) {
+        _classCallCheck(this, Go);
+
+        var _this2 = _possibleConstructorReturn(this, (Go.__proto__ || Object.getPrototypeOf(Go)).call(this, props)); //parent-> the parent Form instance
+
+
+        _this2.ref = _react2.default.createRef();
+        _this2.tellPapa = function () {
+            findPapa(_this2.ref.current).reactHandle.instance.submitData();
+        };
+        return _this2;
+    }
+
+    _createClass(Go, [{
+        key: 'render',
+        value: function render() {
+            return _react2.default.createElement(
+                'button',
+                { ref: this.ref, onClick: this.tellPapa },
+                'Go'
+            );
+        }
+    }]);
+
+    return Go;
+}(_react.Component);
+
+/***/ }),
+/* 44 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _PaginationBoxView = __webpack_require__(45);
+
+var _PaginationBoxView2 = _interopRequireDefault(_PaginationBoxView);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = _PaginationBoxView2.default;
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+/* 45 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _propTypes = __webpack_require__(46);
+
+var _propTypes2 = _interopRequireDefault(_propTypes);
+
+var _PageView = __webpack_require__(49);
+
+var _PageView2 = _interopRequireDefault(_PageView);
+
+var _BreakView = __webpack_require__(50);
+
+var _BreakView2 = _interopRequireDefault(_BreakView);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var PaginationBoxView = function (_Component) {
+  _inherits(PaginationBoxView, _Component);
+
+  function PaginationBoxView(props) {
+    _classCallCheck(this, PaginationBoxView);
+
+    var _this = _possibleConstructorReturn(this, (PaginationBoxView.__proto__ || Object.getPrototypeOf(PaginationBoxView)).call(this, props));
+
+    _this.handlePreviousPage = function (evt) {
+      var selected = _this.state.selected;
+
+      evt.preventDefault ? evt.preventDefault() : evt.returnValue = false;
+      if (selected > 0) {
+        _this.handlePageSelected(selected - 1, evt);
+      }
+    };
+
+    _this.handleNextPage = function (evt) {
+      var selected = _this.state.selected;
+      var pageCount = _this.props.pageCount;
+
+
+      evt.preventDefault ? evt.preventDefault() : evt.returnValue = false;
+      if (selected < pageCount - 1) {
+        _this.handlePageSelected(selected + 1, evt);
+      }
+    };
+
+    _this.handlePageSelected = function (selected, evt) {
+      evt.preventDefault ? evt.preventDefault() : evt.returnValue = false;
+
+      if (_this.state.selected === selected) return;
+
+      _this.setState({ selected: selected });
+
+      // Call the callback with the new selected item:
+      _this.callCallback(selected);
+    };
+
+    _this.callCallback = function (selectedItem) {
+      if (typeof _this.props.onPageChange !== "undefined" && typeof _this.props.onPageChange === "function") {
+        _this.props.onPageChange({ selected: selectedItem });
+      }
+    };
+
+    _this.pagination = function () {
+      var items = [];
+      var _this$props = _this.props,
+          pageRangeDisplayed = _this$props.pageRangeDisplayed,
+          pageCount = _this$props.pageCount,
+          marginPagesDisplayed = _this$props.marginPagesDisplayed,
+          breakLabel = _this$props.breakLabel,
+          breakClassName = _this$props.breakClassName;
+      var selected = _this.state.selected;
+
+
+      if (pageCount <= pageRangeDisplayed) {
+
+        for (var index = 0; index < pageCount; index++) {
+          items.push(_this.getPageElement(index));
+        }
+      } else {
+
+        var leftSide = pageRangeDisplayed / 2;
+        var rightSide = pageRangeDisplayed - leftSide;
+
+        if (selected > pageCount - pageRangeDisplayed / 2) {
+          rightSide = pageCount - selected;
+          leftSide = pageRangeDisplayed - rightSide;
+        } else if (selected < pageRangeDisplayed / 2) {
+          leftSide = selected;
+          rightSide = pageRangeDisplayed - leftSide;
+        }
+
+        var _index = void 0;
+        var page = void 0;
+        var breakView = void 0;
+        var createPageView = function createPageView(index) {
+          return _this.getPageElement(index);
+        };
+
+        for (_index = 0; _index < pageCount; _index++) {
+
+          page = _index + 1;
+
+          if (page <= marginPagesDisplayed) {
+            items.push(createPageView(_index));
+            continue;
+          }
+
+          if (page > pageCount - marginPagesDisplayed) {
+            items.push(createPageView(_index));
+            continue;
+          }
+
+          if (_index >= selected - leftSide && _index <= selected + rightSide) {
+            items.push(createPageView(_index));
+            continue;
+          }
+
+          if (breakLabel && items[items.length - 1] !== breakView) {
+            breakView = _react2.default.createElement(_BreakView2.default, {
+              key: _index,
+              breakLabel: breakLabel,
+              breakClassName: breakClassName
+            });
+            items.push(breakView);
+          }
+        }
+      }
+
+      return items;
+    };
+
+    _this.state = {
+      selected: props.initialPage ? props.initialPage : props.forcePage ? props.forcePage : 0
+    };
+    return _this;
+  }
+
+  _createClass(PaginationBoxView, [{
+    key: 'componentDidMount',
+    value: function componentDidMount() {
+      var _props = this.props,
+          initialPage = _props.initialPage,
+          disableInitialCallback = _props.disableInitialCallback;
+      // Call the callback with the initialPage item:
+
+      if (typeof initialPage !== 'undefined' && !disableInitialCallback) {
+        this.callCallback(initialPage);
+      }
+    }
+  }, {
+    key: 'componentWillReceiveProps',
+    value: function componentWillReceiveProps(nextProps) {
+      if (typeof nextProps.forcePage !== 'undefined' && this.props.forcePage !== nextProps.forcePage) {
+        this.setState({ selected: nextProps.forcePage });
+      }
+    }
+  }, {
+    key: 'hrefBuilder',
+    value: function hrefBuilder(pageIndex) {
+      var _props2 = this.props,
+          hrefBuilder = _props2.hrefBuilder,
+          pageCount = _props2.pageCount;
+
+      if (hrefBuilder && pageIndex !== this.state.selected && pageIndex >= 0 && pageIndex < pageCount) {
+        return hrefBuilder(pageIndex + 1);
+      }
+    }
+  }, {
+    key: 'getPageElement',
+    value: function getPageElement(index) {
+      var selected = this.state.selected;
+      var _props3 = this.props,
+          pageClassName = _props3.pageClassName,
+          pageLinkClassName = _props3.pageLinkClassName,
+          activeClassName = _props3.activeClassName,
+          extraAriaContext = _props3.extraAriaContext;
+
+
+      return _react2.default.createElement(_PageView2.default, {
+        key: index,
+        onClick: this.handlePageSelected.bind(null, index),
+        selected: selected === index,
+        pageClassName: pageClassName,
+        pageLinkClassName: pageLinkClassName,
+        activeClassName: activeClassName,
+        extraAriaContext: extraAriaContext,
+        href: this.hrefBuilder(index),
+        page: index + 1 });
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var _props4 = this.props,
+          disabledClassName = _props4.disabledClassName,
+          previousClassName = _props4.previousClassName,
+          nextClassName = _props4.nextClassName,
+          pageCount = _props4.pageCount,
+          containerClassName = _props4.containerClassName,
+          previousLinkClassName = _props4.previousLinkClassName,
+          previousLabel = _props4.previousLabel,
+          nextLinkClassName = _props4.nextLinkClassName,
+          nextLabel = _props4.nextLabel;
+      var selected = this.state.selected;
+
+
+      var previousClasses = previousClassName + (selected === 0 ? ' ' + disabledClassName : '');
+      var nextClasses = nextClassName + (selected === pageCount - 1 ? ' ' + disabledClassName : '');
+
+      return _react2.default.createElement(
+        'ul',
+        { className: containerClassName },
+        _react2.default.createElement(
+          'li',
+          { className: previousClasses },
+          _react2.default.createElement(
+            'a',
+            { onClick: this.handlePreviousPage,
+              className: previousLinkClassName,
+              href: this.hrefBuilder(selected - 1),
+              tabIndex: '0',
+              role: 'button',
+              onKeyPress: this.handlePreviousPage },
+            previousLabel
+          )
+        ),
+        this.pagination(),
+        _react2.default.createElement(
+          'li',
+          { className: nextClasses },
+          _react2.default.createElement(
+            'a',
+            { onClick: this.handleNextPage,
+              className: nextLinkClassName,
+              href: this.hrefBuilder(selected + 1),
+              tabIndex: '0',
+              role: 'button',
+              onKeyPress: this.handleNextPage },
+            nextLabel
+          )
+        )
+      );
+    }
+  }]);
+
+  return PaginationBoxView;
+}(_react.Component);
+
+PaginationBoxView.propTypes = {
+  pageCount: _propTypes2.default.number.isRequired,
+  pageRangeDisplayed: _propTypes2.default.number.isRequired,
+  marginPagesDisplayed: _propTypes2.default.number.isRequired,
+  previousLabel: _propTypes2.default.node,
+  nextLabel: _propTypes2.default.node,
+  breakLabel: _propTypes2.default.node,
+  hrefBuilder: _propTypes2.default.func,
+  onPageChange: _propTypes2.default.func,
+  initialPage: _propTypes2.default.number,
+  forcePage: _propTypes2.default.number,
+  disableInitialCallback: _propTypes2.default.bool,
+  containerClassName: _propTypes2.default.string,
+  pageClassName: _propTypes2.default.string,
+  pageLinkClassName: _propTypes2.default.string,
+  activeClassName: _propTypes2.default.string,
+  previousClassName: _propTypes2.default.string,
+  nextClassName: _propTypes2.default.string,
+  previousLinkClassName: _propTypes2.default.string,
+  nextLinkClassName: _propTypes2.default.string,
+  disabledClassName: _propTypes2.default.string,
+  breakClassName: _propTypes2.default.string
+};
+PaginationBoxView.defaultProps = {
+  pageCount: 10,
+  pageRangeDisplayed: 2,
+  marginPagesDisplayed: 3,
+  activeClassName: "selected",
+  previousClassName: "previous",
+  nextClassName: "next",
+  previousLabel: "Previous",
+  nextLabel: "Next",
+  breakLabel: "...",
+  disabledClassName: "disabled",
+  disableInitialCallback: false
+};
+exports.default = PaginationBoxView;
+;
+//# sourceMappingURL=PaginationBoxView.js.map
+
+/***/ }),
+/* 46 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(process) {/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+if (process.env.NODE_ENV !== 'production') {
+  var REACT_ELEMENT_TYPE = (typeof Symbol === 'function' &&
+    Symbol.for &&
+    Symbol.for('react.element')) ||
+    0xeac7;
+
+  var isValidElement = function(object) {
+    return typeof object === 'object' &&
+      object !== null &&
+      object.$$typeof === REACT_ELEMENT_TYPE;
+  };
+
+  // By explicitly using `prop-types` you are opting into new development behavior.
+  // http://fb.me/prop-types-in-prod
+  var throwOnDirectAccess = true;
+  module.exports = __webpack_require__(47)(isValidElement, throwOnDirectAccess);
+} else {
+  // By explicitly using `prop-types` you are opting into new production behavior.
+  // http://fb.me/prop-types-in-prod
+  module.exports = __webpack_require__(48)();
+}
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+
+/***/ }),
+/* 47 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+
+
+var assign = __webpack_require__(3);
+
+var ReactPropTypesSecret = __webpack_require__(19);
+var checkPropTypes = __webpack_require__(7);
+
+var printWarning = function() {};
+
+if (process.env.NODE_ENV !== 'production') {
+  printWarning = function(text) {
+    var message = 'Warning: ' + text;
+    if (typeof console !== 'undefined') {
+      console.error(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
+}
+
+function emptyFunctionThatReturnsNull() {
+  return null;
+}
+
+module.exports = function(isValidElement, throwOnDirectAccess) {
+  /* global Symbol */
+  var ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
+  var FAUX_ITERATOR_SYMBOL = '@@iterator'; // Before Symbol spec.
+
+  /**
+   * Returns the iterator method function contained on the iterable object.
+   *
+   * Be sure to invoke the function with the iterable as context:
+   *
+   *     var iteratorFn = getIteratorFn(myIterable);
+   *     if (iteratorFn) {
+   *       var iterator = iteratorFn.call(myIterable);
+   *       ...
+   *     }
+   *
+   * @param {?object} maybeIterable
+   * @return {?function}
+   */
+  function getIteratorFn(maybeIterable) {
+    var iteratorFn = maybeIterable && (ITERATOR_SYMBOL && maybeIterable[ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL]);
+    if (typeof iteratorFn === 'function') {
+      return iteratorFn;
+    }
+  }
+
+  /**
+   * Collection of methods that allow declaration and validation of props that are
+   * supplied to React components. Example usage:
+   *
+   *   var Props = require('ReactPropTypes');
+   *   var MyArticle = React.createClass({
+   *     propTypes: {
+   *       // An optional string prop named "description".
+   *       description: Props.string,
+   *
+   *       // A required enum prop named "category".
+   *       category: Props.oneOf(['News','Photos']).isRequired,
+   *
+   *       // A prop named "dialog" that requires an instance of Dialog.
+   *       dialog: Props.instanceOf(Dialog).isRequired
+   *     },
+   *     render: function() { ... }
+   *   });
+   *
+   * A more formal specification of how these methods are used:
+   *
+   *   type := array|bool|func|object|number|string|oneOf([...])|instanceOf(...)
+   *   decl := ReactPropTypes.{type}(.isRequired)?
+   *
+   * Each and every declaration produces a function with the same signature. This
+   * allows the creation of custom validation functions. For example:
+   *
+   *  var MyLink = React.createClass({
+   *    propTypes: {
+   *      // An optional string or URI prop named "href".
+   *      href: function(props, propName, componentName) {
+   *        var propValue = props[propName];
+   *        if (propValue != null && typeof propValue !== 'string' &&
+   *            !(propValue instanceof URI)) {
+   *          return new Error(
+   *            'Expected a string or an URI for ' + propName + ' in ' +
+   *            componentName
+   *          );
+   *        }
+   *      }
+   *    },
+   *    render: function() {...}
+   *  });
+   *
+   * @internal
+   */
+
+  var ANONYMOUS = '<<anonymous>>';
+
+  // Important!
+  // Keep this list in sync with production version in `./factoryWithThrowingShims.js`.
+  var ReactPropTypes = {
+    array: createPrimitiveTypeChecker('array'),
+    bool: createPrimitiveTypeChecker('boolean'),
+    func: createPrimitiveTypeChecker('function'),
+    number: createPrimitiveTypeChecker('number'),
+    object: createPrimitiveTypeChecker('object'),
+    string: createPrimitiveTypeChecker('string'),
+    symbol: createPrimitiveTypeChecker('symbol'),
+
+    any: createAnyTypeChecker(),
+    arrayOf: createArrayOfTypeChecker,
+    element: createElementTypeChecker(),
+    instanceOf: createInstanceTypeChecker,
+    node: createNodeChecker(),
+    objectOf: createObjectOfTypeChecker,
+    oneOf: createEnumTypeChecker,
+    oneOfType: createUnionTypeChecker,
+    shape: createShapeTypeChecker,
+    exact: createStrictShapeTypeChecker,
+  };
+
+  /**
+   * inlined Object.is polyfill to avoid requiring consumers ship their own
+   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
+   */
+  /*eslint-disable no-self-compare*/
+  function is(x, y) {
+    // SameValue algorithm
+    if (x === y) {
+      // Steps 1-5, 7-10
+      // Steps 6.b-6.e: +0 != -0
+      return x !== 0 || 1 / x === 1 / y;
+    } else {
+      // Step 6.a: NaN == NaN
+      return x !== x && y !== y;
+    }
+  }
+  /*eslint-enable no-self-compare*/
+
+  /**
+   * We use an Error-like object for backward compatibility as people may call
+   * PropTypes directly and inspect their output. However, we don't use real
+   * Errors anymore. We don't inspect their stack anyway, and creating them
+   * is prohibitively expensive if they are created too often, such as what
+   * happens in oneOfType() for any type before the one that matched.
+   */
+  function PropTypeError(message) {
+    this.message = message;
+    this.stack = '';
+  }
+  // Make `instanceof Error` still work for returned errors.
+  PropTypeError.prototype = Error.prototype;
+
+  function createChainableTypeChecker(validate) {
+    if (process.env.NODE_ENV !== 'production') {
+      var manualPropTypeCallCache = {};
+      var manualPropTypeWarningCount = 0;
+    }
+    function checkType(isRequired, props, propName, componentName, location, propFullName, secret) {
+      componentName = componentName || ANONYMOUS;
+      propFullName = propFullName || propName;
+
+      if (secret !== ReactPropTypesSecret) {
+        if (throwOnDirectAccess) {
+          // New behavior only for users of `prop-types` package
+          var err = new Error(
+            'Calling PropTypes validators directly is not supported by the `prop-types` package. ' +
+            'Use `PropTypes.checkPropTypes()` to call them. ' +
+            'Read more at http://fb.me/use-check-prop-types'
+          );
+          err.name = 'Invariant Violation';
+          throw err;
+        } else if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
+          // Old behavior for people using React.PropTypes
+          var cacheKey = componentName + ':' + propName;
+          if (
+            !manualPropTypeCallCache[cacheKey] &&
+            // Avoid spamming the console because they are often not actionable except for lib authors
+            manualPropTypeWarningCount < 3
+          ) {
+            printWarning(
+              'You are manually calling a React.PropTypes validation ' +
+              'function for the `' + propFullName + '` prop on `' + componentName  + '`. This is deprecated ' +
+              'and will throw in the standalone `prop-types` package. ' +
+              'You may be seeing this warning due to a third-party PropTypes ' +
+              'library. See https://fb.me/react-warning-dont-call-proptypes ' + 'for details.'
+            );
+            manualPropTypeCallCache[cacheKey] = true;
+            manualPropTypeWarningCount++;
+          }
+        }
+      }
+      if (props[propName] == null) {
+        if (isRequired) {
+          if (props[propName] === null) {
+            return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required ' + ('in `' + componentName + '`, but its value is `null`.'));
+          }
+          return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required in ' + ('`' + componentName + '`, but its value is `undefined`.'));
+        }
+        return null;
+      } else {
+        return validate(props, propName, componentName, location, propFullName);
+      }
+    }
+
+    var chainedCheckType = checkType.bind(null, false);
+    chainedCheckType.isRequired = checkType.bind(null, true);
+
+    return chainedCheckType;
+  }
+
+  function createPrimitiveTypeChecker(expectedType) {
+    function validate(props, propName, componentName, location, propFullName, secret) {
+      var propValue = props[propName];
+      var propType = getPropType(propValue);
+      if (propType !== expectedType) {
+        // `propValue` being instance of, say, date/regexp, pass the 'object'
+        // check, but we can offer a more precise error message here rather than
+        // 'of type `object`'.
+        var preciseType = getPreciseType(propValue);
+
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + preciseType + '` supplied to `' + componentName + '`, expected ') + ('`' + expectedType + '`.'));
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createAnyTypeChecker() {
+    return createChainableTypeChecker(emptyFunctionThatReturnsNull);
+  }
+
+  function createArrayOfTypeChecker(typeChecker) {
+    function validate(props, propName, componentName, location, propFullName) {
+      if (typeof typeChecker !== 'function') {
+        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside arrayOf.');
+      }
+      var propValue = props[propName];
+      if (!Array.isArray(propValue)) {
+        var propType = getPropType(propValue);
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an array.'));
+      }
+      for (var i = 0; i < propValue.length; i++) {
+        var error = typeChecker(propValue, i, componentName, location, propFullName + '[' + i + ']', ReactPropTypesSecret);
+        if (error instanceof Error) {
+          return error;
+        }
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createElementTypeChecker() {
+    function validate(props, propName, componentName, location, propFullName) {
+      var propValue = props[propName];
+      if (!isValidElement(propValue)) {
+        var propType = getPropType(propValue);
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected a single ReactElement.'));
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createInstanceTypeChecker(expectedClass) {
+    function validate(props, propName, componentName, location, propFullName) {
+      if (!(props[propName] instanceof expectedClass)) {
+        var expectedClassName = expectedClass.name || ANONYMOUS;
+        var actualClassName = getClassName(props[propName]);
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + actualClassName + '` supplied to `' + componentName + '`, expected ') + ('instance of `' + expectedClassName + '`.'));
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createEnumTypeChecker(expectedValues) {
+    if (!Array.isArray(expectedValues)) {
+      process.env.NODE_ENV !== 'production' ? printWarning('Invalid argument supplied to oneOf, expected an instance of array.') : void 0;
+      return emptyFunctionThatReturnsNull;
+    }
+
+    function validate(props, propName, componentName, location, propFullName) {
+      var propValue = props[propName];
+      for (var i = 0; i < expectedValues.length; i++) {
+        if (is(propValue, expectedValues[i])) {
+          return null;
+        }
+      }
+
+      var valuesString = JSON.stringify(expectedValues);
+      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of value `' + propValue + '` ' + ('supplied to `' + componentName + '`, expected one of ' + valuesString + '.'));
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createObjectOfTypeChecker(typeChecker) {
+    function validate(props, propName, componentName, location, propFullName) {
+      if (typeof typeChecker !== 'function') {
+        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside objectOf.');
+      }
+      var propValue = props[propName];
+      var propType = getPropType(propValue);
+      if (propType !== 'object') {
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an object.'));
+      }
+      for (var key in propValue) {
+        if (propValue.hasOwnProperty(key)) {
+          var error = typeChecker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
+          if (error instanceof Error) {
+            return error;
+          }
+        }
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createUnionTypeChecker(arrayOfTypeCheckers) {
+    if (!Array.isArray(arrayOfTypeCheckers)) {
+      process.env.NODE_ENV !== 'production' ? printWarning('Invalid argument supplied to oneOfType, expected an instance of array.') : void 0;
+      return emptyFunctionThatReturnsNull;
+    }
+
+    for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
+      var checker = arrayOfTypeCheckers[i];
+      if (typeof checker !== 'function') {
+        printWarning(
+          'Invalid argument supplied to oneOfType. Expected an array of check functions, but ' +
+          'received ' + getPostfixForTypeWarning(checker) + ' at index ' + i + '.'
+        );
+        return emptyFunctionThatReturnsNull;
+      }
+    }
+
+    function validate(props, propName, componentName, location, propFullName) {
+      for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
+        var checker = arrayOfTypeCheckers[i];
+        if (checker(props, propName, componentName, location, propFullName, ReactPropTypesSecret) == null) {
+          return null;
+        }
+      }
+
+      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`.'));
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createNodeChecker() {
+    function validate(props, propName, componentName, location, propFullName) {
+      if (!isNode(props[propName])) {
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`, expected a ReactNode.'));
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createShapeTypeChecker(shapeTypes) {
+    function validate(props, propName, componentName, location, propFullName) {
+      var propValue = props[propName];
+      var propType = getPropType(propValue);
+      if (propType !== 'object') {
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
+      }
+      for (var key in shapeTypes) {
+        var checker = shapeTypes[key];
+        if (!checker) {
+          continue;
+        }
+        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
+        if (error) {
+          return error;
+        }
+      }
+      return null;
+    }
+    return createChainableTypeChecker(validate);
+  }
+
+  function createStrictShapeTypeChecker(shapeTypes) {
+    function validate(props, propName, componentName, location, propFullName) {
+      var propValue = props[propName];
+      var propType = getPropType(propValue);
+      if (propType !== 'object') {
+        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
+      }
+      // We need to check all keys in case some are required but missing from
+      // props.
+      var allKeys = assign({}, props[propName], shapeTypes);
+      for (var key in allKeys) {
+        var checker = shapeTypes[key];
+        if (!checker) {
+          return new PropTypeError(
+            'Invalid ' + location + ' `' + propFullName + '` key `' + key + '` supplied to `' + componentName + '`.' +
+            '\nBad object: ' + JSON.stringify(props[propName], null, '  ') +
+            '\nValid keys: ' +  JSON.stringify(Object.keys(shapeTypes), null, '  ')
+          );
+        }
+        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
+        if (error) {
+          return error;
+        }
+      }
+      return null;
+    }
+
+    return createChainableTypeChecker(validate);
+  }
+
+  function isNode(propValue) {
+    switch (typeof propValue) {
+      case 'number':
+      case 'string':
+      case 'undefined':
+        return true;
+      case 'boolean':
+        return !propValue;
+      case 'object':
+        if (Array.isArray(propValue)) {
+          return propValue.every(isNode);
+        }
+        if (propValue === null || isValidElement(propValue)) {
+          return true;
+        }
+
+        var iteratorFn = getIteratorFn(propValue);
+        if (iteratorFn) {
+          var iterator = iteratorFn.call(propValue);
+          var step;
+          if (iteratorFn !== propValue.entries) {
+            while (!(step = iterator.next()).done) {
+              if (!isNode(step.value)) {
+                return false;
+              }
+            }
+          } else {
+            // Iterator will provide entry [k,v] tuples rather than values.
+            while (!(step = iterator.next()).done) {
+              var entry = step.value;
+              if (entry) {
+                if (!isNode(entry[1])) {
+                  return false;
+                }
+              }
+            }
+          }
+        } else {
+          return false;
+        }
+
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function isSymbol(propType, propValue) {
+    // Native Symbol.
+    if (propType === 'symbol') {
+      return true;
+    }
+
+    // 19.4.3.5 Symbol.prototype[@@toStringTag] === 'Symbol'
+    if (propValue['@@toStringTag'] === 'Symbol') {
+      return true;
+    }
+
+    // Fallback for non-spec compliant Symbols which are polyfilled.
+    if (typeof Symbol === 'function' && propValue instanceof Symbol) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Equivalent of `typeof` but with special handling for array and regexp.
+  function getPropType(propValue) {
+    var propType = typeof propValue;
+    if (Array.isArray(propValue)) {
+      return 'array';
+    }
+    if (propValue instanceof RegExp) {
+      // Old webkits (at least until Android 4.0) return 'function' rather than
+      // 'object' for typeof a RegExp. We'll normalize this here so that /bla/
+      // passes PropTypes.object.
+      return 'object';
+    }
+    if (isSymbol(propType, propValue)) {
+      return 'symbol';
+    }
+    return propType;
+  }
+
+  // This handles more types than `getPropType`. Only used for error messages.
+  // See `createPrimitiveTypeChecker`.
+  function getPreciseType(propValue) {
+    if (typeof propValue === 'undefined' || propValue === null) {
+      return '' + propValue;
+    }
+    var propType = getPropType(propValue);
+    if (propType === 'object') {
+      if (propValue instanceof Date) {
+        return 'date';
+      } else if (propValue instanceof RegExp) {
+        return 'regexp';
+      }
+    }
+    return propType;
+  }
+
+  // Returns a string that is postfixed to a warning about an invalid type.
+  // For example, "undefined" or "of type array"
+  function getPostfixForTypeWarning(value) {
+    var type = getPreciseType(value);
+    switch (type) {
+      case 'array':
+      case 'object':
+        return 'an ' + type;
+      case 'boolean':
+      case 'date':
+      case 'regexp':
+        return 'a ' + type;
+      default:
+        return type;
+    }
+  }
+
+  // Returns class name of the object, if any.
+  function getClassName(propValue) {
+    if (!propValue.constructor || !propValue.constructor.name) {
+      return ANONYMOUS;
+    }
+    return propValue.constructor.name;
+  }
+
+  ReactPropTypes.checkPropTypes = checkPropTypes;
+  ReactPropTypes.PropTypes = ReactPropTypes;
+
+  return ReactPropTypes;
+};
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+
+/***/ }),
+/* 48 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+
+
+var ReactPropTypesSecret = __webpack_require__(19);
+
+function emptyFunction() {}
+
+module.exports = function() {
+  function shim(props, propName, componentName, location, propFullName, secret) {
+    if (secret === ReactPropTypesSecret) {
+      // It is still safe when called from React.
+      return;
+    }
+    var err = new Error(
+      'Calling PropTypes validators directly is not supported by the `prop-types` package. ' +
+      'Use PropTypes.checkPropTypes() to call them. ' +
+      'Read more at http://fb.me/use-check-prop-types'
+    );
+    err.name = 'Invariant Violation';
+    throw err;
+  };
+  shim.isRequired = shim;
+  function getShim() {
+    return shim;
+  };
+  // Important!
+  // Keep this list in sync with production version in `./factoryWithTypeCheckers.js`.
+  var ReactPropTypes = {
+    array: shim,
+    bool: shim,
+    func: shim,
+    number: shim,
+    object: shim,
+    string: shim,
+    symbol: shim,
+
+    any: shim,
+    arrayOf: getShim,
+    element: shim,
+    instanceOf: getShim,
+    node: shim,
+    objectOf: getShim,
+    oneOf: getShim,
+    oneOfType: getShim,
+    shape: getShim,
+    exact: getShim
+  };
+
+  ReactPropTypes.checkPropTypes = emptyFunction;
+  ReactPropTypes.PropTypes = ReactPropTypes;
+
+  return ReactPropTypes;
+};
+
+
+/***/ }),
+/* 49 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var PageView = function PageView(props) {
+  var cssClassName = props.pageClassName;
+  var linkClassName = props.pageLinkClassName;
+  var onClick = props.onClick;
+  var href = props.href;
+  var ariaLabel = 'Page ' + props.page + (props.extraAriaContext ? ' ' + props.extraAriaContext : '');
+  var ariaCurrent = null;
+
+  if (props.selected) {
+    ariaCurrent = 'page';
+    ariaLabel = 'Page ' + props.page + ' is your current page';
+    if (typeof cssClassName !== 'undefined') {
+      cssClassName = cssClassName + ' ' + props.activeClassName;
+    } else {
+      cssClassName = props.activeClassName;
+    }
+  }
+
+  return _react2.default.createElement(
+    'li',
+    { className: cssClassName },
+    _react2.default.createElement(
+      'a',
+      { onClick: onClick,
+        role: 'button',
+        className: linkClassName,
+        href: href,
+        tabIndex: '0',
+        'aria-label': ariaLabel,
+        'aria-current': ariaCurrent,
+        onKeyPress: onClick },
+      props.page
+    )
+  );
+};
+
+exports.default = PageView;
+//# sourceMappingURL=PageView.js.map
+
+/***/ }),
+/* 50 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var BreakView = function BreakView(props) {
+  var label = props.breakLabel;
+  var className = props.breakClassName || 'break';
+
+  return _react2.default.createElement(
+    'li',
+    { className: className },
+    label
+  );
+};
+
+exports.default = BreakView;
+//# sourceMappingURL=BreakView.js.map
+
+/***/ }),
+/* 51 */
+/***/ (function(module, exports) {
+
+module.exports = Paginator;
+
+// Paginator constructor
+//
+// `per_page` is the number of results per page, `length` is the number of
+// pages to display. They default to `25` and `10` respectively.
+function Paginator(per_page, length) {
+  // You really should be calling this with `new Paginator`, but WHATEVER.
+  if (!(this instanceof Paginator)) {
+    return new Paginator(per_page, length);
+  }
+
+  // Woo, defaults!
+  this.per_page = per_page || 25;
+  this.length = length || 10;
+}
+
+// Build an object with all the necessary information for outputting pagination
+// controls.
+//
+// (new Paginator(paginator.build(100, 2)
+Paginator.prototype.build = function(total_results, current_page) {
+  // We want the number of pages, rounded up to the nearest page.
+  var total_pages = Math.ceil(total_results / this.per_page);
+
+  // Ensure both total_results and current_page are treated as Numbers
+  total_results = parseInt(total_results, 10);
+  current_page  = parseInt(current_page, 10) || 1;
+
+  // Obviously we can't be on a negative or 0 page.
+  if (current_page < 1) { current_page = 1; }
+  // If the user has done something like /page/99999 we want to clamp that back
+  // down.
+  if (current_page > total_pages) { current_page = total_pages; }
+
+  // This is the first page to be displayed as a numbered link.
+  var first_page = Math.max(1, current_page - Math.floor(this.length / 2));
+
+  // And here's the last page to be displayed specifically.
+  var last_page = Math.min(total_pages, current_page + Math.floor(this.length / 2));
+
+  // This is triggered if we're at or near one of the extremes; we won't have
+  // enough page links. We need to adjust our bounds accordingly.
+  if (last_page - first_page + 1 < this.length) {
+    if (current_page < (total_pages / 2)) {
+      last_page = Math.min(total_pages, last_page + (this.length - (last_page - first_page)));
+    } else {
+      first_page = Math.max(1, first_page - (this.length - (last_page - first_page)));
+    }
+  }
+
+  // This can be triggered if the user wants an odd number of pages.
+  if (last_page - first_page + 1 > this.length) {
+    // We want to move towards whatever extreme we're closest to at the time.
+    if (current_page > (total_pages / 2)) {
+      first_page++;
+    } else {
+      last_page--;
+    }
+  }
+
+  // First result on the page. This, along with the field below, can be used to
+  // do "showing x to y of z results" style things.
+  var first_result = this.per_page * (current_page - 1);
+  if (first_result < 0) { first_result = 0; }
+
+  // Last result on the page.
+  var last_result = (this.per_page * current_page) - 1;
+  if (last_result < 0) { last_result = 0; }
+  if (last_result > Math.max(total_results - 1, 0)) { last_result = Math.max(total_results - 1, 0); }
+
+  // GIMME THAT OBJECT
+  return {
+    total_pages: total_pages,
+    pages: Math.min(last_page - first_page + 1, total_pages),
+    current_page: current_page,
+    first_page: first_page,
+    last_page: last_page,
+    previous_page: current_page - 1,
+    next_page: current_page + 1,
+    has_previous_page: current_page > 1,
+    has_next_page: current_page < total_pages,
+    total_results: total_results,
+    results: Math.min(last_result - first_result + 1, total_results),
+    first_result: first_result,
+    last_result: last_result,
+  };
 };
 
 

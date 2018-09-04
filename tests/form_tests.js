@@ -26,7 +26,7 @@ var publisher='Open Road'
 
 describe(prefixId('Search (coordinator of boxes)'),()=>{
 
-    var stage, props, box ,  nativeFetch=fetch, withQuery=(query)=>{console.log(query)}
+    var stage, props, box ,  nativeFetch=fetch, withData=(query)=>{console.log(query)}
 
     before(()=>{
         stage=document.querySelector('#testStage')
@@ -38,7 +38,7 @@ Go will wal up the chain till it finds a form component.
     beforeEach((done)=>{
         ReactDom.render(<React.Fragment><div></div></React.Fragment>,stage)
         box=ReactDom.render(
-            <Form withQuery={withQuery}>
+            <Form withData={withData}>
                 <SearchBox name='main' default='some search terms'/>
                 <Collapsible title='advanced'> 
                     <SearchBox name='author' default={author}/>
@@ -87,7 +87,7 @@ Go will wal up the chain till it finds a form component.
         }
 
         //put spy to check expected value
-        box.getWithQuery=()=>{
+        box.getWithData=()=>{
             return query=>{
                 expect(query).to.deep.include(expectation)
             }

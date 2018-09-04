@@ -1420,18 +1420,37 @@ Queue.promise = function () {
   return Object.assign({ task: task, promise: promise, wait: true }, p);
 };
 
+//takes (query,data)  ,  ({query,data})  ,  ({taskParams, fetchPackage:{query,data}})
 Queue.fetch = function () {
   var pack = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  //must include 'fetchPackage' parameter  or p will be interpreted as the fetchPackage
+  var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+  //format to {taskParams, fetchPackage:{query,data}} 
   if (!pack.fetchPackage) {
-    pack = { fetchPackage: pack };
+    pack = {
+      fetchPackage: {
+        query: typeof pack === 'string' ? pack : pack.query,
+        data: pack.data ? pack.data : data
+      }
+    };
+  }
+
+  //check format a little bit
+  if (!pack.fetchPackage.query) {
+    console.error('invalid fetchPackage subimtted to fetch in Queue', pack);
   } //use the package if it doesn't contain designated package for the fetch function
 
+
   pack.task = function (p) {
-    var prom = fetch(pack.fetchPackage);
-    return prom;
+    var prom = fetch(pack.fetchPackage.query, pack.fetchPackage.data);
+    return prom instanceof Promise ? prom : new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve();
+      }, 0);
+    });
   }; //Queue promise will extract the promise result and pass it down the queue
-  pack.wait = false;
+
+  pack.wait = false; //because you're returning a promise.
   return pack;
 };
 Queue.ajax = function () {
@@ -15865,15 +15884,28 @@ function getFromServer() {
         withResult = _par$withResult === undefined ? nfunc : _par$withResult,
         _par$noSuccess = par.noSuccess,
         noSuccess = _par$noSuccess === undefined ? nfunc : _par$noSuccess,
+        _par$sec = par.sec,
+        sec = _par$sec === undefined ? 15 : _par$sec,
         _par$getType = par.getType,
         getType = _par$getType === undefined ? 'json' : _par$getType;
+    var _par$timeout = par.timeout,
+        timeout = _par$timeout === undefined ? function () {
+        console.log('server at ' + query + ' timed out');
+    } : _par$timeout;
 
     if (!query) {
         throw new Error('no query/host submitted to getFromServer get_from_server.js');
     }
     if (queue.status().queueLength === 0) {
         //if the queue has completed the last fetch, get a new one
-        queue.fetch(query, data).add(function (p) {
+
+        var pack = {
+            fetchPackage: par,
+            timeout: timeout,
+            sec: sec
+        };
+
+        queue.fetch(pack).add(function (p) {
             //check result ok
             if (!p.result.ok) {
                 p.control.change(); //change wipes out future steps
@@ -33905,7 +33937,7 @@ describe((0, _unique_id.prefixId)('Search (coordinator of boxes)'), function () 
         props,
         box,
         nativeFetch = fetch,
-        withQuery = function withQuery(query) {
+        withData = function withData(query) {
         console.log(query);
     };
 
@@ -33924,7 +33956,7 @@ describe((0, _unique_id.prefixId)('Search (coordinator of boxes)'), function () 
         ), stage);
         box = _reactDom2.default.render(_react2.default.createElement(
             _form.Form,
-            { withQuery: withQuery },
+            { withData: withData },
             _react2.default.createElement(_search_box.SearchBox, { name: 'main', 'default': 'some search terms' }),
             _react2.default.createElement(
                 _collapsible_flex_item.Collapsible,
@@ -33975,7 +34007,7 @@ describe((0, _unique_id.prefixId)('Search (coordinator of boxes)'), function () 
             after_collapsible: 'after'
 
             //put spy to check expected value
-        };box.getWithQuery = function () {
+        };box.getWithData = function () {
             return function (query) {
                 expect(query).to.deep.include(expectation);
             };
@@ -34010,8 +34042,6 @@ var _react2 = _interopRequireDefault(_react);
 
 var _queue = __webpack_require__(7);
 
-var _app_constants = __webpack_require__(15);
-
 var _collapsible_flex_item = __webpack_require__(36);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -34021,9 +34051,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var host = _app_constants.constants.host;
-
 
 var collectData = function collectData(domNode) {
     //should be a formNode
@@ -34090,16 +34117,16 @@ var Form = exports.Form = function (_Component) {
         var _this = _possibleConstructorReturn(this, (Form.__proto__ || Object.getPrototypeOf(Form)).call(this, props));
 
         _this.formRef = _react2.default.createRef();
-        _this.getWithQuery = function () {
-            return function () {
-                return _this.props.withQuery;
-            } || function () {
-                console.error('tried to submit a form with no callback to <Form/>');
+        _this.getWithData = function () {
+            // 
+            return _this.props.withData || function () {
+                return console.error("called 'Go' with no withData function");
             };
         };
+
         _this.submitData = function () {
             var data = collectData(_this.formRef.current);
-            _this.getWithQuery()(data);
+            _this.getWithData()(data);
         };
         return _this;
     }
@@ -34156,7 +34183,6 @@ var Go = exports.Go = function (_Component2) {
 
         _this2.ref = _react2.default.createRef();
         _this2.tellPapa = function () {
-            console.log(findPapa(_this2.ref.current));
             findPapa(_this2.ref.current).reactHandle.instance.submitData();
         };
         return _this2;

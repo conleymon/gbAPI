@@ -5,12 +5,20 @@ var queue= new Queue()
 
 export function getFromServer(par={}){
     var nfunc=()=>{}
-    var {query , data={} , withResult=nfunc , noSuccess=nfunc, getType='json'}=par
+    var {query , data={} , withResult=nfunc , noSuccess=nfunc, sec=15 , getType='json'}=par
+    var {timeout=()=>{console.log('server at ' + query + ' timed out')}}=par
     if(!query){
         throw new Error('no query/host submitted to getFromServer get_from_server.js')
     }
     if(queue.status().queueLength===0){//if the queue has completed the last fetch, get a new one
-        queue.fetch(query,data)
+
+        var pack={
+            fetchPackage:par,
+            timeout,
+            sec 
+        }
+
+        queue.fetch(pack)
             .add((p)=>{//check result ok
                 if(!p.result.ok){
                     p.control.change()//change wipes out future steps
@@ -21,7 +29,8 @@ export function getFromServer(par={}){
             .add((p)=>{return p.result[getType]()})//should be a promise
             .add((p)=>{ withResult(p.result) })
             .kickStart()
-    }else{//if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
+
+        }else{//if not finished schedule this function at the end of the queue. 'finally' sets/resets a single callback to be executed upon completion o fthe queue 
         queue.finally(p=>{
             p.control.clear().finally(nfunc)//finally persists and would cause a loop above if not replaced before restarting.
             getFromServer(par)

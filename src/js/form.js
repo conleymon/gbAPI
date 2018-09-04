@@ -1,9 +1,7 @@
 import React, {Component} from 'react'
 import {Queue} from 'queue'
-import { constants } from 'app_constants'
 import { Collapsible } from 'collapsible_flex_item'
 
-var {host}=constants
 
 var collectData=function(domNode){//should be a formNode
     //make a registry of the elements in the form to check and see if the node we're visiting is a form element or not. 
@@ -55,13 +53,14 @@ export class Form extends Component{//fields takes an array of an array of field
         constructor(props){
         super(props)
         this.formRef=React.createRef()
-        this.getWithQuery=()=>{ 
-            return (()=>this.props.withQuery) ||
-            (()=>{console.error('tried to submit a form with no callback to <Form/>')})
+        this.getWithData=()=>{
+            // 
+            return (this.props.withData || ( ()=>console.error("called 'Go' with no withData function") ))
         }
+
         this.submitData=()=>{
             var data=collectData(this.formRef.current)
-            this.getWithQuery()(data)
+            this.getWithData()(data)
         }
     }
     makeTrace(){
@@ -90,7 +89,6 @@ export class Go extends Component{//fields takes an array of an array of fields
         super(props)
         this.ref=React.createRef()
         this.tellPapa=()=>{
-            console.log(findPapa(this.ref.current))
             findPapa(this.ref.current).reactHandle.instance.submitData()
         }
     }

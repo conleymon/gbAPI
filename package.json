@@ -9,8 +9,10 @@
   "author": "Conley Johnson",
   "license": "MIT",
   "dependencies": {
+    "paginator": "^1.0.0",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
+    "react-paginate": "^5.2.4",
     "write": "^1.0.3"
   },
   "devDependencies": {
