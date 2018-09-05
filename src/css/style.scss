@@ -1,63 +1,12 @@
-/*
-modifier--
-element__
-*/
-$orangeHue:#aa5d39;
-$greenHue:#759D34;
-$blueHue:#267257;
-$purpleHue:#8D2F5D;
-$lightTextGrayScale:#ddd;
-
-$layoutBG:#444;
-$componentBG:#111;
-$componentMargin:2px;
-$buttonTextMargin:5px;
-
-@mixin componentContainer(){
-    background-color:$componentBG;
-    margin:$componentMargin;
-}
-body,.cover{
+.cover{
     position:absolute;
+    left:0;
+    top:0;
     height:100%;
     width:100%;
 }
-html,body{
-    margin:0;
-//    overflow:hidden;
-    body{
-        background-color: $layoutBG;
-    }
-}
 
-$buttonColor:linear-gradient(30deg, darken($greenHue, 20%) 10%, $blueHue 20%);
-
-.button{
-    box-shadow: 0px 2px 2px;
-    font-size: 1.3em;
-    border: radius 0.2em;
-    &--regular{
-        color:white;
-        background-image:$buttonColor;
-    }
-}
-
-/*
-alright, an app component is to be inserted inside a display-flex container.
-    if you set the flex basis of the component to content, then you can expand and contract the content window...
-    what to do if a row/column is too long? I think there's a no wrap property somewhere that may help
-
-*/
-.flex{
-    display:flex;
-}
-.flush{
-    margin:0px;
-}
-
-
-.canvasAndPlayerContainer{
-    flex-grow:5;
+.appContainer{
     display:flex;
     flex-direction:column;
 }

@@ -1,8 +1,7 @@
 import React, {Component} from 'react'
 import {getFromServerThrottled} from 'get_from_server'
-import ReactPaginate from 'react-paginate'
+import {Paginate} from 'paginate'
 import Paginator from 'paginator'
-
 /* *gibberish decision: whether or not google's rejection is because the search terms were gibberish (there really are no results) or the page number was exceeded
 */
 var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
@@ -12,7 +11,7 @@ export class SearchResults extends Component{
         super(props)
         this.query=''
         this.resultsPerPage=20
-        this.pagesShown=10
+        this.pagesShown=5
         this.paginator = new Paginator(this.resultsPerPage,this.pagesShown)
         this.makePages=(totalResults=0,page=0)=>{
             this.pageStatus=this.paginator.build(totalResults,page)
@@ -22,7 +21,7 @@ export class SearchResults extends Component{
         this.status='ready'  //fetching, ready  
         this.changePage=(page)=>{
             if(this.status!=='ready'){return}
-            this.makePages(this.pageStatus.total_results,page.selected)
+            this.makePages(this.pageStatus.total_results,page)
             this.getResult()
         }
         
@@ -82,6 +81,7 @@ export class SearchResults extends Component{
             gibberish terms, and there really are no results (fail or no result with page=0 request)
             pagenumber exeeded
         */
+       console.log({result})
         if(!result.status && result.items && result.items instanceof Array){//if successful, the result should be extracted
             this.result=result       
             this.makePages(result.totalItems,this.pageStatus.current_page)//revise total pages based on results. (freezing requests during fetch is not decided at the time of this comment.)
@@ -102,13 +102,29 @@ export class SearchResults extends Component{
             this.getResult()
         }
     }
+    moreInfo(link){
+        this.infoWindow=window.open(link,'infoWindow')
+    }
+    getImage(v){
+        var v=v.volumeInfo
+        var src=''
+        if(v.imageLinks && v.imageLinks.smallThumbnail){
+            src=v.imageLinks.smallThumbnail
+        }
+        return <img src={src}/>
+    }
     formatItem(v){
         var volume=v.volumeInfo
         return(
             <div>
-                <div>{volume.title}</div>
-                <div>{volume.authors.join(', ')}</div>
-                <div onClick={this.props.showDetails||(()=>{})}>More Info</div>
+                <div>
+                    <h3>{volume.title || 'No Title'}</h3>
+                    <h5>{volume.subtitle || ''}</h5>
+                </div>
+                {this.getImage(v)}
+                Authors: {volume.authors?volume.authors.join(', '):'Unknown'}<br />
+                Publisher: {volume.publisher?volume.publisher :'Unknown'}<br />
+                <div onClick={this.moreInfo.bind(this, volume.infoLink)}>More Info</div>
             </div>
         )
     }
@@ -118,17 +134,13 @@ export class SearchResults extends Component{
         if(this.status==='fetching'){return (<span>Getting Results</span>)}
         if(this.pageStatus.total_results===0){return (<span>No Results</span>)}
         var ps =this.pageStatus
+        console.log(this.pageStatus)
         return (
             <React.Fragment>
-                <ReactPaginate
-                    pageCount={ps.total_pages}
-                    pageRangeDisplayed={this.pagesShown}
-                    MarginPagesDisplayed={4}
-                    forcePage={ps.current_page}
+                <Paginate
+                    {...this.pageStatus}
                     onPageChange={this.changePage}
-                >
-
-                </ReactPaginate>
+                />
                 {(this.result.items || []).map(this.formatItem.bind(this))}
             </React.Fragment>
         )

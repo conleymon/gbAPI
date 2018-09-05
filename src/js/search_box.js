@@ -1,6 +1,8 @@
 import React, {Component} from 'react'
 import {getFromServerThrottled} from 'get_from_server'
 
+import styles from 'style.scss'
+
 var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
 
 export class SearchBox extends Component{
@@ -71,10 +73,11 @@ export class SearchBox extends Component{
         input.addEventListener('keyup',this.autoComplete.bind(this))
     }
     render(){
+        console.log({styles })
         return( 
             <div>
                 {this.props.label||''}
-                <input  ref={this.searchRef} name={this.name()} defaultValue={this.emptyVal()} />
+                <input ref={this.searchRef} name={this.name()} defaultValue={this.emptyVal()} />
                 {this.getChoices()}
             </div>
         )

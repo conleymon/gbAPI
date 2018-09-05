@@ -1,11 +1,18 @@
 import React, {Component} from 'react'
 import ReactDom from 'react-dom'
-import {SearchBox} from 'search_box'
-import {buildQuery, formatResponse} from 'search_box_build_queries'
-import {Form, Go} from 'Form'
-import {Collapsible} from 'collapsible_flex_item'
-import { SearchResults } from './js/search_results';
+import { SearchBox } from 'search_box'
+import { buildQuery , formatResponse } from 'search_box_build_queries'
+import { Form, Go } from 'form'
+import { Collapsible } from 'collapsible_flex_item'
+import { SearchResults } from 'search_results';
 import { constants } from 'app_constants';
+
+import styles from 'style.scss'
+var getClasses=function(){
+    var classes=Array.prototype.slice.call(arguments)
+    classes=classes.map(v=>styles[v]).join(' ')
+    return classes
+}
 
 var{ host } = constants
 
@@ -37,7 +44,7 @@ class SearchComponent extends Component{
     render(){
         return(
             <React.Fragment>
-                <Form withData={this.withData}>
+                <Form withData={this.withData} className={getClasses('appContainer','cover')}>
                     <SearchBox name='main' buildQuery={buildQuery} formatResponse={formatResponse}/>
                     <Collapsible title='advanced'>
                         <SearchBox name='title' default='Hemmingway'/>
@@ -46,20 +53,7 @@ class SearchComponent extends Component{
                     </Collapsible>
                     <Go/>
                 </Form>
-                <SearchResults ref={this.resultsRef} query={this.query}/>
-            </React.Fragment>
-        )
-    }
-}
-
-class VolumeDetails extends Component{
-    constructor(props){
-        super(props)
-    }
-    render(){
-        return(
-            <React.Fragment>
-            {this.props.children}
+                <SearchResults ref={this.resultsRef} query={this.query} showDetails={this.props.showDetails}/>
             </React.Fragment>
         )
     }
@@ -75,14 +69,12 @@ window.VolumesAPI=function(){
     this.render=function(p={}){
         var {container}=p
         if(container){this.container=container}
-//        ReactDom.render(<SearchComponent showDetails={this.showDetails.bind(this)}/>,this.container)
-        ReactDom.render(<SearchComponent/>,this.container
-        )
+        ReactDom.render(<SearchComponent showDetails={this.showDetails.bind(this)}/>,this.container)
     }
-    this.showDetails=function(data){
+    this.showDetails=(data)=>{
         var useContainer=this.detailsContainment==='fullCoverage'?document.body:this.container
         var style={zIndex:getHighestZ(useContainer)}
-        ReactDom.render(<VolumeDetails data={data} style={style}/>, this.detailsPane)
+        ReactDom.render(<VolumeDetails volume={data} style={style}/>, this.detailsPane)
         useContainer.appendChild(this.detailsPane)
     }
     this.hideDetails=function(){

@@ -40,8 +40,18 @@ module.exports = {
         {
           test: /\.s?css$/,
           exclude: [/node_modules/],
+          use:['style-loader',{
+              loader:'css-loader',
+              options:{
+                modules: true,
+                localIdentName: '[name]__[local]--[hash:base64:5]',  
+              }
+            },
+            'postcss-loader','sass-loader'
+          ],
+
 //*
-          loaders:['style-loader','css-loader','postcss-loader','sass-loader'],
+//          loaders:['style-loader','css-loader','postcss-loader','sass-loader'],
 /*/
           use: ExtractTextPlugin.extract(
             { 

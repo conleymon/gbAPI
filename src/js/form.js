@@ -41,7 +41,7 @@ var collectData=function(domNode){//should be a formNode
     propagate(domNode)
     return data
 }
-var findPapa=function(node,targetType=Form){
+var findPapa=function(node,targetType=Form){//find the 'Form' component containing the 'Go' component that activated it
     var test=node
     var stop=document.querySelector('body')
     while(test!==stop){
