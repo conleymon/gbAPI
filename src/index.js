@@ -8,12 +8,10 @@ import { Collapsible } from 'collapsible_vertical_regular'
 import { SearchResults } from 'search_results';
 import { constants } from 'app_constants';
 
-import {prodBacks} from 'prodBacks'
 
 
 import styles from 'style.scss'
 
-import { getProdBack } from './js/prodBacks';
 var getClasses=function(){
     var classes=Array.prototype.slice.call(arguments)
     classes=classes.map(v=>styles[v]).join(' ')
