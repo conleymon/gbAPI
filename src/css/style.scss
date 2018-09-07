@@ -1,5 +1,30 @@
+
+
+$orangeHue:#aa5d39;
+$greenHue:#759D34;
+$blueHue:#267257;
+$purpleHue:#8D2F5D;
+$lightTextGrayScale:#ddd;
+$darkGray:#444;
+
+$buttonColor:linear-gradient(30deg, darken($greenHue, 20%) 10%, $blueHue 20%);
+
+
+@mixin flex_fill_box($grow:1,$shrink:0,$basis:auto){
+    margin:0;
+    flex:$grow $shrink $basis;
+}
+@mixin flex_container($direction:row){
+    display:flex;
+    flex-direction:$direction;
+}
+@mixin center_text {
+    padding:10px;
+    text-align: center;
+    vertical-align: middle;
+}
 .cover{
-    position:absolute;
+    position:relative;
     left:0;
     top:0;
     height:100%;
@@ -7,6 +32,135 @@
 }
 
 .appContainer{
-    display:flex;
-    flex-direction:column;
+    @include flex_container(column);
+    margin:0;
+    position:relative;
+    & input{
+        width:80%;
+        margin:5px;
+        padding:5px;
+        border:1px solid darken($lightTextGrayScale, 40%);
+        background-color:$lightTextGrayScale;
+        height:2.5em;
+        color:$darkGray;
+        border-radius: .4em;
+
+
+    }
+}
+
+.collapsible{
+    >div:nth-child(1){
+        background-image: $buttonColor;
+        padding:10px;
+        text-align: center;
+        color:$lightTextGrayScale;
+        cursor:pointer;
+    }
+}
+
+.form{
+    @include flex_fill_box(0);
+    @include flex_container();
+    &>.fields{
+        @include flex_fill_box(8);
+        @include flex_container(column);
+        position:relative;
+    }
+    &>.go{
+        @include flex_fill_box(0);
+        padding:10px;
+        background-color:$purpleHue;
+        color:$lightTextGrayScale;
+        cursor:pointer;
+        
+        display:flex;
+        margin:0;
+        @include center_text();
+        position:relative;
+        justify-content: center;
+        align-items: center;
+        align-content: middle;
+        
+    }
+}
+
+.autocomplete_listing{
+    padding:5px;
+    border-bottom: 1px solid grey;
+    border-left: 1px solid grey;
+    border-right: 1px solid grey;
+    background-color: #ddd;
+    cursor:pointer;
+    >div:nth-child(1){
+        font-size:1.5em;
+    }
+    &:hover{
+        background-color: #267257;
+    }
+}
+.main_search_box{
+    width:100%;    
+}
+
+.results{
+    @include flex_fill_box(8);
+    overflow:auto;
+}
+.results_listing{
+    margin: 10% 10px;
+    border-radius: .5em;
+    position:relative;
+    vertical-align: top;
+    background-color: grey;
+
+
+    >div:nth-child(1){
+        width:20%;
+        position:relative;
+        display:inline-block;
+        padding:5px;
+    }
+    >div:nth-child(2){
+        vertical-align: top;
+        margin: 10px;
+        display:inline-block;
+        padding:5px;
+        >div:nth-child(1){
+            font-size:1.5em;
+            font-weight:bold;
+        }
+    }
+    >div:nth-child(3){
+        display:block;
+        cursor:pointer;
+        color:$lightTextGrayScale;
+        @include center_text();
+        box-shadow: 0 0 10px black;
+        border: 1px solid black;
+        background-color: $darkGray;
+        &:hover{
+            background-color: #267257;
+        }
+    }
+}
+.paginate{
+    display:block;
+    text-align:center;
+    &>div:hover{
+        color: $greenHue;
+    }
+    &>div{
+        display:inline-block;
+        margin:3px;
+        cursor:pointer;
+    }
+    &>.currentPageNum{
+        color:grey;
+    }
+    &>.pageNum{
+        text-decoration: underline;
+        color:black;
+    }
+    
 }

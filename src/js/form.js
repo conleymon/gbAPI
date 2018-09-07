@@ -1,7 +1,6 @@
 import React, {Component} from 'react'
-import {Queue} from 'queue'
-import { Collapsible } from 'collapsible_flex_item'
-
+//import {Queue} from 'queue'
+//import { Collapsible } from 'collapsible_flex_item'
 
 var collectData=function(domNode){//should be a formNode
     //make a registry of the elements in the form to check and see if the node we're visiting is a form element or not. 
@@ -24,7 +23,7 @@ var collectData=function(domNode){//should be a formNode
                      if(child.getAttribute('type')==='checkbox'){pointer[name]=child.getAttribute('checked')}
                 }
             }
-            if(child.reactHandle && child.reactHandle.construct===Collapsible){
+            if(child.reactHandle && child.reactHandle.construct==='Collapsible'){
                 var instance=child.reactHandle.instance
                 var title=instance.props.title
                 pointer[title]={open:instance.open}
@@ -32,7 +31,7 @@ var collectData=function(domNode){//should be a formNode
                 sections.push[pointer]
             }
             propagate(child)
-            if(child.reactHandle && child.reactHandle.construct===Collapsible){
+            if(child.reactHandle && child.reactHandle.construct==='Collapsible'){
                 sections.pop()
                 pointer=sections[sections.length-1] || data                
             }
@@ -74,15 +73,12 @@ export class Form extends Component{//fields takes an array of an array of field
     render(){
         //the Go button can be place anywhere in the component but needs to 
         return(
-            <React.Fragment>
-                <form ref={this.formRef} >
+                <form ref={this.formRef} style={this.props.style} className={this.props.className}>
                     {this.props.children||(<span></span>)}
                 </form>
-            </React.Fragment>
         )
     }
 }
-
 //activates finds the form node above it and activates with
 export class Go extends Component{//fields takes an array of an array of fields
         constructor(props){//parent-> the parent Form instance
@@ -94,7 +90,15 @@ export class Go extends Component{//fields takes an array of an array of fields
     }
     render(){
         return(
-            <button ref={this.ref} onClick={this.tellPapa}>Go</button>
+            <div 
+                ref={this.ref}
+                style={this.props.style} 
+                className={this.props.className}  
+                onClick={this.tellPapa}
+                activateform='true'
+            >
+                <div >{this.props.text || 'Go'}</div>
+            </div>
         )
     }
 }

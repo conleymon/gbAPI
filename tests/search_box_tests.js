@@ -160,12 +160,10 @@ describe(prefixId('SearchBox component'),()=>{
 
         //make autocomplete spy
         var wrappedAutoComplete=box.autoComplete.bind(box)
-        box.autoComplete=function(){
+        box.autoComplete=function(br=false){
             autoNum++
-            wrappedAutoComplete()
+            wrappedAutoComplete(true)
         }
-
-        input.addEventListener('keyup',box.autoComplete)
 
         var i=11
         var queue=new Queue()

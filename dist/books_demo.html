@@ -1,6 +1,29 @@
-<html><body></body></html>
+<html>
+    <head>
+        <style>
+            body,html{
+                position:absolute;
+                height:100%;
+                width:100%;
+            }
+            .container{
+                position:absolute;
+                height:100%;
+                width:50%;
+                left:50%;
+
+            }
+        </style>
+    </head>
+    <body>
+        Main/Parent App
+        <div class='container'></div>
+    </body>
+</html>
 <script src="js/google_books_api_bundle.js"></script>
 <script >
     var Books=new VolumesAPI()
-    Books.render()
+    Books.render({
+        container:document.querySelector('.container')
+    })
 </script>

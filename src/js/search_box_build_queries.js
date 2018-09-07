@@ -1,5 +1,6 @@
 import React, {Component} from 'react'
 import {constants} from 'app_constants'
+import styles from 'style.scss'
 var {host}=constants
 
 export var buildQuery=function(input){
@@ -7,16 +8,16 @@ export var buildQuery=function(input){
 }
 
 export var formatResponse=function(response){
-    return response.items.map((v)=>{
+    return (response.items || []).map((v)=>{
         var info=v.volumeInfo
         return {
             value:info.title,
             content:(
-                <React.Fragment>
+                <div className={styles.autocomplete_listing}>
                     <div>{info.title}</div>
                     <div>{info.subtitle}</div>
-                    <div>{info.authors.join(', ')}</div>
-                </React.Fragment>
+                    <div>{(info.authors||[]).join(', ')}</div>
+                </div>
             )
         }
     })

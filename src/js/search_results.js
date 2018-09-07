@@ -2,9 +2,10 @@ import React, {Component} from 'react'
 import {getFromServerThrottled} from 'get_from_server'
 import {Paginate} from 'paginate'
 import Paginator from 'paginator'
-/* *gibberish decision: whether or not google's rejection is because the search terms were gibberish (there really are no results) or the page number was exceeded
-*/
+import styles from 'style.scss'
+
 var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
+
 
 export class SearchResults extends Component{
     constructor(props){
@@ -25,33 +26,6 @@ export class SearchResults extends Component{
             this.getResult()
         }
         
-
-        /*
-
-        on instantiation, there is no result
-        you have to get a result on update, so as not to interfere with the initial render.
-        onmount, 
-
-        paginator and paginate...
-
-        paginate should be rendered with different props when the query changes
-
-
-        stateVars:
-        query
-        pagenumber
-        status
-        on receiving a new query prop, if it is different, the page will be reset to 1. otherwise, the component should not update
-
-        changes in 
-            the query prop
-                resets the page to 0
-            the page
-                only resets the page
-        
-        cause the fetching status to take into effect
-        */
-        
     }
     buildQuery(){//for now handles pages. takes the page requested and calculates tbe start index and adds it to the query
         return this.query
@@ -59,6 +33,7 @@ export class SearchResults extends Component{
             +"&maxResults="+(this.resultsPerPage)
     }
     getResult(){
+        console.log(this.buildQuery())
         var page=this.pageStatus.page_number //store the pagenumber for the gibberish decision*
         var pack={
             query:this.buildQuery(),
@@ -81,8 +56,7 @@ export class SearchResults extends Component{
             gibberish terms, and there really are no results (fail or no result with page=0 request)
             pagenumber exeeded
         */
-       console.log({result})
-        if(!result.status && result.items && result.items instanceof Array){//if successful, the result should be extracted
+        if(!result.status && result.items && result.items instanceof Array){//if successful, the result should be extracted            
             this.result=result       
             this.makePages(result.totalItems,this.pageStatus.current_page)//revise total pages based on results. (freezing requests during fetch is not decided at the time of this comment.)
         }
@@ -111,38 +85,49 @@ export class SearchResults extends Component{
         if(v.imageLinks && v.imageLinks.smallThumbnail){
             src=v.imageLinks.smallThumbnail
         }
-        return <img src={src}/>
+        return <img src={src} style={{width:'100%'}}/>
     }
     formatItem(v){
         var volume=v.volumeInfo
+
         return(
-            <div>
-                <div>
-                    <h3>{volume.title || 'No Title'}</h3>
-                    <h5>{volume.subtitle || ''}</h5>
+            <div  className={styles.results_listing}>
+                <div >
+                    {this.getImage(v)}
                 </div>
-                {this.getImage(v)}
-                Authors: {volume.authors?volume.authors.join(', '):'Unknown'}<br />
-                Publisher: {volume.publisher?volume.publisher :'Unknown'}<br />
-                <div onClick={this.moreInfo.bind(this, volume.infoLink)}>More Info</div>
+                <div >
+                    <div><em>{volume.title?volume.title:'Unknown'}</em></div>
+                    <div>Authors: {volume.authors?volume.authors.join(', '):'Unknown'}</div>
+                    <div>Publisher: {volume.publisher?volume.publisher :'Unknown'}</div>
+                </div>
+                <div  onClick={this.moreInfo.bind(this, volume.infoLink)}>More Info</div>
             </div>
         )
     }
 
     render(){
         //you can check here if the state is different from the props
-        if(this.status==='fetching'){return (<span>Getting Results</span>)}
-        if(this.pageStatus.total_results===0){return (<span>No Results</span>)}
-        var ps =this.pageStatus
-        console.log(this.pageStatus)
-        return (
-            <React.Fragment>
-                <Paginate
-                    {...this.pageStatus}
-                    onPageChange={this.changePage}
-                />
-                {(this.result.items || []).map(this.formatItem.bind(this))}
-            </React.Fragment>
+        var content
+        if(this.status==='fetching'){content= (<span>Getting Results</span>)}
+        else if(this.pageStatus.total_results===0){content= (<span>No Results</span>)}
+        else{
+            content=(
+                <React.Fragment>
+                    {(this.result.items || []).map(this.formatItem.bind(this))}
+                    <Paginate
+                        {...this.pageStatus}
+                        onPageChange={this.changePage}
+                    />
+                </React.Fragment>
+            )
+
+        }
+
+        return(
+            <div style={this.props.style} className={this.props.className}>
+                {content}
+            </div>
+
         )
 
     }

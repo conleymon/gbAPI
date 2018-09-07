@@ -3,11 +3,17 @@ import ReactDom from 'react-dom'
 import { SearchBox } from 'search_box'
 import { buildQuery , formatResponse } from 'search_box_build_queries'
 import { Form, Go } from 'form'
-import { Collapsible } from 'collapsible_flex_item'
+//import { Collapsible } from 'collapsible_flex_item'
+import { Collapsible } from 'collapsible_vertical_regular'
 import { SearchResults } from 'search_results';
 import { constants } from 'app_constants';
 
+import {prodBacks} from 'prodBacks'
+
+
 import styles from 'style.scss'
+
+import { getProdBack } from './js/prodBacks';
 var getClasses=function(){
     var classes=Array.prototype.slice.call(arguments)
     classes=classes.map(v=>styles[v]).join(' ')
@@ -17,25 +23,24 @@ var getClasses=function(){
 var{ host } = constants
 
 
-
-
 class SearchComponent extends Component{
     constructor(props){
         super(props)
+        this.formRef=React.createRef()
         this.resultsRef=React.createRef()
         this.query=''
         this.withData=(data)=>{
             //build query 
             var query=[]
             var root=host+'?q='+data.main.replace(/\s/g, '+')
-            if(data.advanced.open){
-                var advanced= data.advanced
+            if(data.Advanced.open){
+                var advanced= data.Advanced
                 for(let a in advanced){
                     if(a==='open'){continue}// migth have to add a meta-information space later. i don't like having no distinction between form element values and meta data
-                    if(advanced[a]!==''){query.push(a+':'+advanced[a])}
+                    if(advanced[a]!==''){query.push('in'+a+':'+advanced[a])}
                 }
             }
-            this.query=root + query.join(' ').replace(/\s/g,'+')
+            this.query=root +'+'+ query.join(' ').replace(/\s/g,'+')
 
             //and submit it to Search results.
             this.forceUpdate()        
@@ -43,42 +48,42 @@ class SearchComponent extends Component{
     }
     render(){
         return(
-            <React.Fragment>
-                <Form withData={this.withData} className={getClasses('appContainer','cover')}>
-                    <SearchBox name='main' buildQuery={buildQuery} formatResponse={formatResponse}/>
-                    <Collapsible title='advanced'>
-                        <SearchBox name='title' default='Hemmingway'/>
-                        <SearchBox name='author'/>
-                        <SearchBox name='publisher'/>
-                    </Collapsible>
-                    <Go/>
+            <div   className={getClasses('appContainer','cover')}>
+                <Form  ref={this.formRef}className={styles.form} withData={this.withData}>
+                    <div  className={styles.fields}>
+                        <SearchBox
+                            name='main'
+                            default='Search' 
+                            searchClass={styles.main_search_box} 
+                            buildQuery={buildQuery}
+                            formatResponse={formatResponse}
+                            postChoose={()=>{this.formRef.current.submitData()}}
+                        />
+                        <Collapsible className={styles.appComponent} open={false} className={styles.collapsible} title='Advanced'>
+                            <div>Title: <SearchBox name='title' /></div>
+                            <div>Author: <SearchBox name='author' /></div>
+                            <div>Publisher: <SearchBox name='publisher' /></div>
+                        </Collapsible>
+                    </div>
+                    <Go  className={styles.go}>go</Go>
                 </Form>
-                <SearchResults ref={this.resultsRef} query={this.query} showDetails={this.props.showDetails}/>
-            </React.Fragment>
+                <SearchResults query={this.query}  className={styles.results}/>
+            </div>
         )
     }
 }
 
-window.VolumesAPI=function(){
+window.VolumesAPI=function(p={}){
+    var {container}=p
+    if(container){this.container=container}
     this.container=document.querySelector('body')
     this.detailsContainment='contained'
     this.readerContainment='contained'
 
-    this.detailsPane=document.createElement('div')
-
     this.render=function(p={}){
         var {container}=p
         if(container){this.container=container}
-        ReactDom.render(<SearchComponent showDetails={this.showDetails.bind(this)}/>,this.container)
-    }
-    this.showDetails=(data)=>{
-        var useContainer=this.detailsContainment==='fullCoverage'?document.body:this.container
-        var style={zIndex:getHighestZ(useContainer)}
-        ReactDom.render(<VolumeDetails volume={data} style={style}/>, this.detailsPane)
-        useContainer.appendChild(this.detailsPane)
-    }
-    this.hideDetails=function(){
-       (document.body.contains(this.detailsPane)?document.body:this.container).removeChild(this.detailsPane) 
+        ReactDom.render(<SearchComponent/>,this.container)
     }
 }
 var getHighestZ=function(node){

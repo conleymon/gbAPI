@@ -10,8 +10,8 @@ import {makeSpy} from 'make_spy'
 import {formatResponse,buildQuery} from 'search_box_build_queries'
 import {Form, Go} from 'form'
 import {SearchBox} from 'search_box'
-import {Collapsible} from 'collapsible_flex_item'
-
+//import {Collapsible} from 'collapsible_flex_item'
+import { Collapsible } from 'collapsible_vertical_regular'
 var host=constants.host
 
 
@@ -72,9 +72,9 @@ Go will wal up the chain till it finds a form component.
         var click=new MouseEvent('click',{ bubbles: true })
         
         //get go and toggle buttons
-        var go=box.formRef.current.querySelector('button')
+        var go=box.formRef.current.querySelector('div[activateForm=true]')
         var toggleButton=box.formRef.current.querySelector("div[togglecomponent=true]")
-        
+        console.log(go)
         //prepare expected value
         var expectation={
             main:'some search terms',
@@ -89,6 +89,7 @@ Go will wal up the chain till it finds a form component.
         //put spy to check expected value
         box.getWithData=()=>{
             return query=>{
+                console.log({query,expectation})
                 expect(query).to.deep.include(expectation)
             }
         }
