@@ -71,7 +71,7 @@ export class SearchBox extends Component{
         var formattedData=this.formatResponse()(this.autoData)
         if(!formattedData){return}
         var choices=formattedData.map((v)=>{
-           return  ( <div onClick={this.makeChoice.bind(this,v)} name='autoCompleteChoice' data-choice={v.value}> {v.content} </div> )
+           return  ( <div onMouseDown={this.makeChoice.bind(this,v)} name='autoCompleteChoice' data-choice={v.value}> {v.content} </div> )
         })
         return choices
     }

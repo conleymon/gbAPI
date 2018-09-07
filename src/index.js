@@ -3,7 +3,6 @@ import ReactDom from 'react-dom'
 import { SearchBox } from 'search_box'
 import { buildQuery , formatResponse } from 'search_box_build_queries'
 import { Form, Go } from 'form'
-//import { Collapsible } from 'collapsible_flex_item'
 import { Collapsible } from 'collapsible_vertical_regular'
 import { SearchResults } from 'search_results';
 import { constants } from 'app_constants';
