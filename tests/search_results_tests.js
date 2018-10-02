@@ -6,6 +6,7 @@ import {prefixId} from 'unique_id'
 import {Queue} from 'queue'
 import {makeSpy} from 'make_spy'
 import {SearchResults} from 'search_results'
+var equal=require('deep-equal')
 
 var searchQuery='https://www.googleapis.com/books/v1/volumes?q=hemmingway+'
 var secondSearchQuery = 'https://www.googleapis.com/books/v1/volumes?q=winston+churchill+'
