@@ -124,18 +124,18 @@ insert(see Add)
 
 	inserts tasks between the current task and the next task in the queue
 
-   change(see Add)
+change(see Add)
 
 	wipes out the remaining steps after the current step, and adds its argument to the queue
 
-   finally(function)		
+finally(function)		
 
 	submits a callback function to be called on completion of the queue
 
 ###  Built-In Methods
 These methods comprise a growing toolbox of chainable tasks. They add tasks to the end of the queue.
 
-   all(Array of task Objects, 2 dimensional permitted )
+all(Array of task Objects, 2 dimensional permitted )
 
 	takes an array of functions || task Objects ||Queues || promises || Array of any combination of the preceding  and returns an allTask that runs the tasks simultaneously (in respective queues). The allTask does not resolve till all the steps are completed. A second dimension array will be inserted as a sequential queueline with respect to  the allTask
     
@@ -168,7 +168,7 @@ Note: In order to include standard properties on a call to all(), wrap the above
 		}
 	})
 
-   race(see all)
+race(see all)
 
 	takes an array of task and returns a race task that runs the tasks simultaneously (in respective queues). The first step to be completed resolves the race Task and advances the queue
 
@@ -182,7 +182,7 @@ Note: In order to include standard properties on a call to all(), wrap the above
 		.add(()=>{console.log("I'm finished")})
 		//waits 50 miliseconds then outputs: "I'm finished"
 		  
-   animate(param object)
+animate(param object)
 	
 	animates any object from current to destination, using javascript driven incrementing
 	parameters:{
@@ -196,7 +196,8 @@ Note: In order to include standard properties on a call to all(), wrap the above
 		preInc: function to be executed before each animation frame
 		postInc: function to be executed after each animation frame
 	}
-   transition(param object)
+
+transition(param object)
 	
 	animates the style of a node through css transition
 	parameters: {
@@ -207,11 +208,11 @@ Note: In order to include standard properties on a call to all(), wrap the above
 		synch:boolean determines whether to merge the transform with the existing transform or replace it
 	}
 			
-   wait(miliseconds || {from:milliseconds, to:milliseconds})
+wait(miliseconds || {from:milliseconds, to:milliseconds})
 	
 	waits a specified duration before moving to the next step. If a range object is submitted, it will choose a random duration between the from and to values submitted on the object.
 
-   ajax(param object)
+ajax(param object)
 	
 	simple ajax requests
 	parameters:{
@@ -223,7 +224,7 @@ Note: In order to include standard properties on a call to all(), wrap the above
 	Return value
 	p.result= {response,status} //onload
 		  
-   blink(param object)
+blink(param object)
 	
 	oscilates a node's opacity between 1 and 0 a specified number of times at a specified rate
     parameters:{
@@ -253,13 +254,13 @@ Each of the Built-In methods also has a generator attached to the constructor. T
 * Queue.blink 
   
 ### Flow Control
-   stop()
+stop()
 
 	stops the queue
-   kickStart()
+kickStart()
 
 	starts a queue if not running
-   interrupt()
+interrupt()
 
 	interrupts the current task, executes the earlyTermination function, if provided
   
@@ -283,36 +284,36 @@ splice(param object)
 	If the from argument stretches back to include current or past tasks, the from indes will be reset to the first future task in the queue.
 	if the returned indexes are out of order, nothing is altered. 
 			  
-  clear()
-	
+clear()
+
 	stops the queue, clears the tasks
 		  
-   clearResults(optional:queueline)
+clearResults(optional:queueline)
 	
 	clears the results of a queueline
 	parameters: any queueline. default is the native queueline.
 			 
-   pop()
+pop()
 	
 	pops off the last step in the queueline. fails if the last task is already started
 		  
-   delete(string name || number index)
+delete(string name || number index)
 	
 	deletes the specified step from the queueline
 			parameters:name or index
 			
-   find(string name || number index)
+find(string name || number index)
 	
 	searches for a step having the submitted name or index. returns undefined if not found
   
 On slicing: copies of the queueLine are returned, and each task is a shallow copy of the original, with results cleared and individual task subscriptions cloned. So a sliced queueline can be filtered, mapped and so on, and the sliced queueline segment will run independently in a new Queue. However, the function references contained in the sliced tasks point to the original functions  which may still have closure variables that will be operated upon when reached in a new Queue. Of course, this is problem easily solved by creating Queue/queueline factories, which return new Queues/queuelines free and clear for splicing/running.
 
 ### Listening
- subscribe(function || {cb:function})
+subscribe(function || {cb:function})
 
 	subscribes a listener to be executed upon completion of the queue
 		  
-   unsubscribe(function || {cb:function})
+unsubscribe(function || {cb:function})
 	
 	unsubscribes a listener
 
@@ -332,8 +333,8 @@ while subscribe and unsubscribe are mainly for general subscription
 	someQueueInstance.subscribe(myCallBack)
 	//tells someQueueInstance to execute the callBack when finished.
 
-  ### Querying
-   status()
+### Querying
+status()
 
 	returns an object :{
 		currentTask, 
@@ -344,11 +345,11 @@ while subscribe and unsubscribe are mainly for general subscription
 		queueLine:shallow copy of the queueLine array
 	}
 				
-   allDone()
+allDone()
 
 	returns true if all tasks in the queue have been resolved
 		  
-   running()
+running()
 
 	returns true if the queue is running.
 
