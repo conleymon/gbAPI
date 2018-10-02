@@ -6,7 +6,6 @@ import styles from 'style.scss'
 
 var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
 
-
 export class SearchResults extends Component{
     constructor(props){
         super(props)
@@ -17,6 +16,7 @@ export class SearchResults extends Component{
         this.makePages=(totalResults=0,page=0)=>{
             this.pageStatus=this.paginator.build(totalResults,page)
         }
+
         this.makePages()
         this.result=null
         this.status='ready'  //fetching, ready  
@@ -24,17 +24,20 @@ export class SearchResults extends Component{
             if(this.status!=='ready'){return}
             this.makePages(this.pageStatus.total_results,page)
             this.getResult()
-        }
-        
+        }        
+        this.ref=React.createRef()
     }
+
     buildQuery(){//for now handles pages. takes the page requested and calculates tbe start index and adds it to the query
+        var start=this.pageStatus.current_page-1
+        if(start<0){start=0}
         return this.query
-            +'&startIndex='+(this.resultsPerPage*this.pageStatus.current_page)
+            +'&startIndex='+(this.resultsPerPage*start)
             +"&maxResults="+(this.resultsPerPage)
     }
+
     getResult(){
-        console.log(this.buildQuery())
-        var page=this.pageStatus.page_number //store the pagenumber for the gibberish decision*
+        var page=this.pageStatus.current_page //store the pagenumber for the gibberish decision*
         var pack={
             query:this.buildQuery(),
             withResult:(result)=>{
@@ -87,11 +90,11 @@ export class SearchResults extends Component{
         }
         return <img src={src} style={{width:'100%'}}/>
     }
-    formatItem(v){
+    formatItem( v , i ){
         var volume=v.volumeInfo
 
         return(
-            <div  className={styles.results_listing}>
+            <div key={i} className={styles.results_listing}>
                 <div >
                     {this.getImage(v)}
                 </div>
@@ -124,11 +127,9 @@ export class SearchResults extends Component{
         }
 
         return(
-            <div style={this.props.style} className={this.props.className}>
+            <div ref={this.ref} style={this.props.style} className={this.props.className}>
                 {content}
             </div>
-
         )
-
     }
 }

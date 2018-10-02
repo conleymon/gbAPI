@@ -10,7 +10,6 @@ import {makeSpy} from 'make_spy'
 import {formatResponse,buildQuery} from 'search_box_build_queries'
 import {Form, Go} from 'form'
 import {SearchBox} from 'search_box'
-//import {Collapsible} from 'collapsible_flex_item'
 import { Collapsible } from 'collapsible_vertical_regular'
 var host=constants.host
 
@@ -24,17 +23,14 @@ var publisher='Open Road'
 
 
 
-describe(prefixId('Search (coordinator of boxes)'),()=>{
+describe(prefixId('Search Form'),()=>{
 
-    var stage, props, box ,  nativeFetch=fetch, withData=(query)=>{console.log(query)}
+    var stage, props, box ,  nativeFetch=fetch, withData=(query)=>{}
 
     before(()=>{
         stage=document.querySelector('#testStage')
     })
-/*
-ok then, 
-Go will wal up the chain till it finds a form component.
-*/
+
     beforeEach((done)=>{
         ReactDom.render(<React.Fragment><div></div></React.Fragment>,stage)
         box=ReactDom.render(
@@ -55,7 +51,6 @@ Go will wal up the chain till it finds a form component.
         ,stage
         )
 
-        //I think there might be some asynchronicity in reactDom global render that's messing with the test. so queue it up.
         new Queue()
             .add({
                 preCondition:()=>box.formRef.current,
@@ -68,14 +63,11 @@ Go will wal up the chain till it finds a form component.
         fetch=nativeFetch
     })
     it(prefixId('collects data correctly on clicking "go", including open/close status of nested sections'),()=>{
-        //prepare click event, expectated value, 
-        var click=new MouseEvent('click',{ bubbles: true })
+        var mouseDown=new MouseEvent('mousedown',{ bubbles: true })
         
-        //get go and toggle buttons
         var go=box.formRef.current.querySelector('div[activateForm=true]')
         var toggleButton=box.formRef.current.querySelector("div[togglecomponent=true]")
-        console.log(go)
-        //prepare expected value
+
         var expectation={
             main:'some search terms',
             advanced:{open:true, author, title, publisher, nested:{
@@ -86,20 +78,17 @@ Go will wal up the chain till it finds a form component.
             after_collapsible:'after'
         }
 
-        //put spy to check expected value
         box.getWithData=()=>{
             return query=>{
-                console.log({query,expectation})
                 expect(query).to.deep.include(expectation)
             }
         }
 
-        go.dispatchEvent(click)
+        go.dispatchEvent(mouseDown)
         
-        //close section and make sure it shows up in the results
-        toggleButton.dispatchEvent(click)
+        toggleButton.dispatchEvent(mouseDown)
         expectation.advanced.open=false
-        go.dispatchEvent(click)
+        go.dispatchEvent(mouseDown)
 
 
     })

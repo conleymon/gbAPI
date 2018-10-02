@@ -119,7 +119,7 @@ function Queue(){
     return this
   }
 
-  this.initVal=(v)=>{initialValue=v}
+  this.initVal=(v)=>{initialValue=v;return this}
 
   this.status=function(control=false){
     return {
@@ -150,7 +150,7 @@ function Queue(){
   }
 
   this.insert=function(p={}){ //takes single value or an array, and each task(exposed or wrapped in an array) is either a function or a task object
-    this.add(p,true)
+    return this.add(p,true)
   }
 
   this.repeat=(p={})=>{
@@ -387,6 +387,7 @@ function Queue(){
     if(!cb){console.error('queue.js subscribeTask({name||index,cb})->no function to attach:',p);return this}
     var task=this.find(p)
     if(!task){console.error('queue.js subscribeTask()->unable to find task:',p);return this}
+    task=task.action
     if(task.resolved){cb(task);return this}
     task.subscriptions.set(cb,1)
     return this
@@ -397,6 +398,7 @@ function Queue(){
     if(!cb){console.error('queue.js subscribeTask({name||index,cb})->no function to unattach:',p);return this}
     var task=this.find(p)
     if(!task){console.error('queue.js subscribeTask()->unable to find task:',p);return this}
+    task=task.action
     if(check){console.log('task',task,'has callback'+cb.toString(),task.subscriptions.has(cb))}
     task.subscriptions.delete(cb,1)
     return this
@@ -508,7 +510,7 @@ Queue.fetch=function(pack={},data={}){
 
   pack.task=(p)=>{
     var prom=fetch(pack.fetchPackage.query,pack.fetchPackage.data)
-    return prom instanceof Promise ?prom:new Promise(function(resolve){setTimeout(()=>{resolve()},0)
+    return prom instanceof Promise ? prom:new Promise(function(resolve){setTimeout(()=>{resolve()},0)
     })
   }//Queue promise will extract the promise result and pass it down the queue
   

@@ -20,7 +20,7 @@ export class SearchBox extends Component{
         }
 
         this.label=()=>this.props.label||''
-        this.name=()=>this.props.name||(()=>{throw error('no name in SearchBox component')})
+        this.name=()=>(this.props.name||(()=>{throw Error('no name in SearchBox component')})())
         this.emptyVal=()=>this.props.default||''
 
         var nullfunc=v=>v;
@@ -70,8 +70,8 @@ export class SearchBox extends Component{
         if(this.autoData===null){return(<span></span>)}
         var formattedData=this.formatResponse()(this.autoData)
         if(!formattedData){return}
-        var choices=formattedData.map((v)=>{
-           return  ( <div onMouseDown={this.makeChoice.bind(this,v)} name='autoCompleteChoice' data-choice={v.value}> {v.content} </div> )
+        var choices=formattedData.map((v,i)=>{
+           return  ( <div key={i} onMouseDown={this.makeChoice.bind(this,v)} name='autoCompleteChoice' data-choice={v.value}> {v.content} </div> )
         })
         return choices
     }
@@ -106,8 +106,9 @@ export class SearchBox extends Component{
     render(){
         return( 
             <div style={this.boxStyle}>
+
                 <div className={this.props.labelClass}>{this.props.label||''}</div>
-                <input  ref={this.searchRef} autoComplete={this.buildQuery()?'on':'off'}name={this.name()} id={this.props.id} defaultValue={this.emptyVal()} className={this.props.searchClass} />
+                <input  ref={this.searchRef} autoComplete={this.buildQuery()?'on':'off'} name={this.name()} id={this.props.id} defaultValue={this.emptyVal()} className={this.props.searchClass} />
                 <div style={this.choiceStyle}>
                     {this.getChoices()}
                 </div>

@@ -35,7 +35,7 @@ export class Collapsible extends Component{
         this.contentStyle=this.getContentStyle()
         return (
             <span ref={this.ref} className={this.props.className}>
-                <div  togglecomponent='true' onClick={this.toggle.bind(this)} className={this.props.className}>
+                <div  togglecomponent='true' onMouseDown={this.toggle.bind(this)} className={this.props.className}>
                     {this.props.title}
                 </div>
                 <div ref={this.content} style={Object.assign({},this.contentStyle)}>

@@ -6,19 +6,9 @@ import ReactDom from 'react-dom'
 import {prefixId} from 'unique_id'
 import {constants} from 'app_constants'
 import {Queue} from 'queue'
-import {formatResponse,buildQuery} from 'search_box_build_queries'
+import { formatResponse , buildQuery } from 'search_box_build_queries'
 import {makeSpy} from 'make_spy'
 var host=constants.host
-
-/*
---mounts
---displays default text when unfocused and emptied
---triggers on each keyup, successful retrieval, and rendering
---10 keyups in rapid succession, one response 
-
---choosing one populates the search field with the value
---postChoose activated
-*/
 
 
 var qs=(thing)=>document.querySelector(thing)
@@ -35,9 +25,8 @@ describe(prefixId('SearchBox component'),()=>{
 
     beforeEach((done)=>{
         ReactDom.render(<React.Fragment><div></div></React.Fragment>,stage)
-        box=ReactDom.render(<SearchBox buildQuery={buildQuery} formatResponse={formatResponse}/>,stage)
+        box=ReactDom.render(<SearchBox buildQuery={buildQuery} formatResponse={formatResponse}  name='testcomponent'/>,stage)
 
-        //I think there might be some asynchronicity in reactDom global render that's messing with the test. so queue it up.
         new Queue()
             .add({
                 preCondition:()=>box.searchRef.current,
@@ -62,14 +51,13 @@ describe(prefixId('SearchBox component'),()=>{
     it(prefixId('clears and restores default message properly'),(done)=>{
         var input=qs('#testStage input')
 
-        var eventFired=false//events are added to runtime queuestack, and may not fire before the evaluation. make a spy that sets eventfired to true when fired, and set handled as a precondition to perform evaluation in the queue 
+        var eventFired=false 
         var handled=()=>{ eventFired=true }
         box.handleDefaultText = makeSpy({spyFunc : handled  ,  spiedFunc : box.handleDefaultText  ,  context : box })
 
         //reattach listeners to spy
         box.componentDidMount()
 
-        //build queue
         var queue=new Queue()
         var addSegment=function(action,expectedValue){
             queue.add(()=>{ 
@@ -93,7 +81,6 @@ describe(prefixId('SearchBox component'),()=>{
         addSegment('focus' , author)
         addSegment('blur' , author)
         
-        //add test termination and start the queue
         queue
             .add(()=>{done()})
             .kickStart()
@@ -105,15 +92,13 @@ describe(prefixId('SearchBox component'),()=>{
             done();done=nfunc
         }
         ReactDom.render(<React.Fragment><div></div></React.Fragment>,stage)
-        box=ReactDom.render(<SearchBox postChoose={postChoose} buildQuery={buildQuery} formatResponse={formatResponse}/>,stage)
+        box=ReactDom.render(<SearchBox postChoose={postChoose} buildQuery={buildQuery} formatResponse={formatResponse} name='testComponent'/>,stage)
 
         var input=qs('#testStage input')
         
-        //setup event and submit
         input.value=author
         var keyup=new KeyboardEvent('keyup')
 
-        //put spy in componentDidUpdate to activate choice 
         var nativeComponentDidUpdate=(
             box.componentDidUpdate||
             (()=>{box.componentDidUpdate=function(){}; return box.componentDidUpdate})()
@@ -123,42 +108,37 @@ describe(prefixId('SearchBox component'),()=>{
         box.componentDidUpdate=function(){
             firstResult=input.parentNode.querySelector('[name=autoCompleteChoice]')
             if(firstResult !== null){ 
-                choiceData=firstResult.dataset.choice//just stores the value
-                expect(pass++).to.equal(0)// in this test, the keyup should trigger the first dispatch     
-                firstResult.dispatchEvent(new MouseEvent('click',{ bubbles: true })//this will cause another update, fired after clearing the choices and setting the value
+                choiceData=firstResult.dataset.choice
+                expect(pass++).to.equal(0)   
+                firstResult.dispatchEvent(new MouseEvent('mousedown',{ bubbles: true })
             )}
             else{
-                //
-                expect(input.value).to.equal(choiceData)//the input should be set to the value of the choice made
-                expect(pass).to.equal(1)//choices should be cleared, and the input value set
-                //postchoose fired after componentdidupdate. put done() there.
+                expect(input.value).to.equal(choiceData)
+                expect(pass).to.equal(1)
             }           
-            //nativeComponentDidUpdate()
         }.bind(box)
-
         input.dispatchEvent(keyup)
-
     }).timeout(7000)
 
     it(prefixId('rapid keyup events throttle down to 1 request'),(done)=>{
-        //the second request should happn
         var input=qs('#testStage input')
         input.value=author
         var keyup=new KeyboardEvent('keyup')
         var autoNum=0
 
-        //setup for dispatch
-        fetch=()=>{//spy
-
+        fetch=(url,body)=>{
             expect(autoNum).to.equal(10)
-            done()
-            done=()=>{}
-            return nativeFetch(...arguments)
+            makeSpy({
+                spyFunc:function(){}, 
+                spiedFunc:'componentDidUpdate',
+                context:box,
+                done
+            })
+            return nativeFetch(url,body)
         }
 
         input.value=author
 
-        //make autocomplete spy
         var wrappedAutoComplete=box.autoComplete.bind(box)
         box.autoComplete=function(br=false){
             autoNum++
@@ -167,12 +147,11 @@ describe(prefixId('SearchBox component'),()=>{
 
         var i=11
         var queue=new Queue()
-        while(--i){//add successive key up events to the queue at 50 ms intervals, threshhold should be 200
+        while(--i){
             queue
                 .add(()=>{input.dispatchEvent(keyup)})
                 .wait(30)
         }
-
         queue.kickStart()
     })
 })

@@ -1,5 +1,4 @@
 export var makeSpy=function(p={}){
-    //unpack
     var {spyFunc, spiedFunc,context=null,done}=p
     
     //if spiedFunc is a string, retrieve function from context
@@ -9,18 +8,16 @@ export var makeSpy=function(p={}){
         spiedFunc=context[spiedFunc]
     }
 
-    //make spyfunction
-    var currentHolder=(spiedFunc||function(){}).bind(context)
+    var existingFunc=(spiedFunc||function(){}).bind(context)
 
     var returnFunction = function(){
-        spyFunc(...arguments)
-        currentHolder(...arguments)
+        spyFunc.call( context, ...arguments )
+        existingFunc(...arguments)
         if(done){done();}
-    }
+    }.bind(context)
 
     //set if spiedfunc is String, return if spiedfunc is function 
     if(spyFuncStringRef){
-        context[spyFuncStringRef]=returnFunction
-    }else{ return returnFunction}
-
+        context[spyFuncStringRef] = returnFunction
+    }else{ return returnFunction }
 }
