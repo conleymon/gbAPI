@@ -36,20 +36,13 @@ var collectData=function(domNode){//should be a formNode
     propagate(domNode)
     return data
 }
-var findParentForm=function(node,targetType=Form){
-    var test=node
-    var stop=document.querySelector('body')
-    while(test!==stop){
-        if(test.reactHandle && test.reactHandle.construct===targetType){return test}
-        test=test.parentNode
-    }
-}
+
+
 export class Form extends Component{
         constructor(props){
         super(props)
         this.formRef=React.createRef()
         this.getWithData=()=>{
-            // 
             return (this.props.withData || ( ()=>console.error("called 'Go' with no withData function") ))
         }
 
@@ -58,12 +51,12 @@ export class Form extends Component{
             this.getWithData()(data)
         }
     }
-    makeTrace(){
+    mark(){
         this.formRef.current.reactHandle={construct:Form,instance:this}
     }
-    componentDidUpdate(){ this.makeTrace() }
+    componentDidUpdate(){ this.mark() }
     componentDidMount(){ 
-        this.makeTrace()
+        this.mark()
         this.formRef.current.onsubmit=()=>false
     }
     render(){
@@ -74,6 +67,20 @@ export class Form extends Component{
         )
     }
 }
+
+
+
+
+
+var findParentForm=function(node,targetType=Form){
+    var test=node
+    var stop=document.querySelector('body')
+    while(test!==stop){
+        if(test.reactHandle && test.reactHandle.construct===targetType){return test}
+        test=test.parentNode
+    }
+}
+
 export class Go extends Component{
         constructor(props){
         super(props)

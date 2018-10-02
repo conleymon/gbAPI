@@ -27,19 +27,16 @@ class SearchComponent extends Component{
         this.resultsRef=React.createRef()
         this.query=''
         this.withData=(data)=>{
-            //build query 
             var query=[]
             var root=host+'?q='+data.main.replace(/\s/g, '+')
             if(data.Advanced.open){
                 var advanced= data.Advanced
                 for(let a in advanced){
-                    if(a==='open'){continue}// migth have to add a meta-information space later. i don't like having no distinction between form element values and meta data
+                    if(a==='open'){continue}
                     if(advanced[a]!==''){query.push('in'+a+':'+advanced[a])}
                 }
             }
             this.query=root +'+'+ query.join(' ').replace(/\s/g,'+')
-
-            //and submit it to Search results.
             this.forceUpdate()        
         }    
     }
@@ -82,15 +79,4 @@ window.VolumesAPI=function(p={}){
         if(container){this.container=container}
         ReactDom.render(<SearchComponent/>,this.container)
     }
-}
-var getHighestZ=function(node){
-    if(!node.children.length){return 1}
-    var mark=-99999999
-    var markHighest=v=>{
-        if(v.style && v.style.zindex>mark){
-            mark=v.style.zIndex
-        }
-    }
-    Array.prototype.slice.call(node.children).forEach(markHighest)
-    return mark
 }

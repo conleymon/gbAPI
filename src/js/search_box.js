@@ -32,7 +32,7 @@ export class SearchBox extends Component{
         this.formatResponse=()=>this.props.formatResponse||nullfunc 
         this.postChoose=()=>this.props.postChoose||(()=>{})
 
-        this.autoData=null//autocomplete server responses go here  
+        this.serverResponses=null
         this.blockAutoComplete=false
     }
     getValue(){
@@ -57,7 +57,7 @@ export class SearchBox extends Component{
             { 
                 withResult : (result)=>{
                     if(!this.blockAutoComplete){
-                        this.autoData=result
+                        this.serverResponses=result
                         this.forceUpdate()    
                     }
                 } 
@@ -66,8 +66,8 @@ export class SearchBox extends Component{
         getFromServer(pack) 
     }
     getChoices(){
-        if(this.autoData===null){return(<span></span>)}
-        var formattedData=this.formatResponse()(this.autoData)
+        if(this.serverResponses===null){return(<span></span>)}
+        var formattedData=this.formatResponse()(this.serverResponses)
         if(!formattedData){return}
         var choices=formattedData.map((v,i)=>{
            return  ( <div key={i} onMouseDown={this.makeChoice.bind(this,v)} name='autoCompleteChoice' data-choice={v.value}> {v.content} </div> )
@@ -75,7 +75,7 @@ export class SearchBox extends Component{
         return choices
     }
     makeChoice(choice){
-        this.autoData=null
+        this.serverResponses=null
         if(choice){this.searchRef.current.value=choice.value}
 
         this.forceUpdate()
@@ -85,7 +85,7 @@ export class SearchBox extends Component{
         var events=['blur','focus'] , input=this.searchRef.current
         events.forEach((v)=>{
             input.addEventListener(v,this.handleDefaultText.bind(this))
-            input.addEventListener(v,()=>{this.autoData=null;this.forceUpdate()})
+            input.addEventListener(v,()=>{this.serverResponses=null;this.forceUpdate()})
         })
         input.addEventListener('keyup',
             (e)=>{
