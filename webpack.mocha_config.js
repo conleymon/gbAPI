@@ -1,5 +1,5 @@
 //clone top level references
-var backBone={...require('./webpack.production_config.js')}
+var backBone=Object.assign({} , require('./webpack.production_config.js'))
 
 backBone.entry= ['./tests/test_entry.js']
 backBone.output={

@@ -3,8 +3,12 @@ Written with React. Includes auto-complete in the main search box, and advanced 
  
 ## Build
 	1. Clone repository
-	2. Run npm install
-	3. Run webpack --config webpack.all_config.js
+	2. Navigate to project directory
+	3. Run npm install
+	4. Run webpack --config webpack.all_config.js
+	5. Run 'node server.js'
+	6. tests should be available  at http://localhost:8080/tests/run_tests.htm
+	7. app demo should be available  at http://localhost:8080/dist/books_demo.html
 
 Three config files are included
 * webpack.production_config.js ->Builds the app
@@ -13,7 +17,7 @@ Three config files are included
 
 	
 ## Usage
-Include a script tag pointing to the the build file, in this case, 
+In your html file, include a script tag pointing to the the build file, in this case, 
 ```
 <script src='dist/js/google_books_api_bundle.js'>
 ```
