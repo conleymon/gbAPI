@@ -2,18 +2,14 @@
 Copyright Conley Johnson 2018
 License:MIT
 
-interrupt and stop should be tested. It may hang the queue upon restart
-interrupt().add(...) may need kickstart
-
 */
 if(module &&module.exports){
   var ObjectAnimator=require('animator').ObjectAnimator
 }
-//import {ObjectAnimator} from 'animator'
 
 var clearResults=(p={})=>{
   if(p.constructor===Array){p={l:p}}
-  var{l=[]}=p//l stands for line as in queueLine, but any array fitting the queueLine format
+  var{l=[]}=p
   l=arrayWrap(l)
   var len=l.length
   for(var index=0;index<len;index++){
@@ -32,7 +28,7 @@ var  arrayWrap=function(thing){
 }
 
 var format=(p)=>{
-  p=p?p:()=>{}//if undefined, set with a function	
+  p=p?p:()=>{}
   return clearResults(
   arrayWrap(p).map((val)=>{
     if(val.constructor===Promise){val=Queue.promise(val)}
@@ -41,7 +37,6 @@ var format=(p)=>{
     if(typeof val==='function'){val={task:val}}
     var{task=()=>{},preCondition=()=>true,postCondition=()=>true,wait=false,name=undefined, comment='',sec=3600,timeout=()=>{},earlyTermination=()=>{},getValue=false,getValueFromTask=false,queue=false}=val				
     return {task,preCondition,postCondition,wait,name,comment:task.toString(),sec,timeout,earlyTermination,getValue,getValueFromTask,initiated:false,resolved:false,queue,subscriptions:new Map(),evaluation:null}
-    //wait means, wait for a restart from the task. getvalue is an override function for retrieving the value to store after the promise is done. if not set, the argument provided by done is used
     })
   )		
 }
@@ -181,9 +176,9 @@ function Queue(){
   }
 
   this.start=(p={})=>{
-    if(terminated && !p.unterminate){/*console.error('this queue has been terminated. to restart, restart({unterminate:true}) queue.js start()')*/}else{terminated=false}	 
-    if(p.indexMatch){if(p.indexMatch!==queueIndex){/*console.log('tried to restart:'+p.indexMatch+'. current index:'+queueIndex);*/return this}}
-    if(p.initialValue!==undefined){initialValue=p.initialValue}//only matters when starting from 0
+    if(terminated && !p.unterminate){}else{terminated=false}	 
+    if(p.indexMatch){if(p.indexMatch!==queueIndex){return this}}
+    if(p.initialValue!==undefined){initialValue=p.initialValue}
     if(p.callBack){this.finally(p.callBack)}
     clearTimeout(queueHandle);clearTimeout(timeoutHandle);listen();
     return this	  
@@ -195,14 +190,14 @@ function Queue(){
     if(!q.initiated){
       if(q.preCondition()){
         var result=q.task(getControlPackage())		
-        if(result instanceof Promise){ this.insert(result)}//should route through Queue.promise, where then->(result)=>p.done(result) will be attached
+        if(result instanceof Promise){ this.insert(result)}
         if(!q.wait){
           q.result=result
         }
         q.initiated=true
       }
       if(q.wait){
-        this.stop({wait:true});return;//advance will be triggered at the end of the task. generally postCondition return true, but thats up to the developer
+        this.stop({wait:true});return;
       }
     }
     if(q.initiated){
@@ -216,10 +211,10 @@ function Queue(){
     var ret= {
       control:this,
       done:function(indexMatch,result){
-        if(queueLine[indexMatch]===undefined){/*console.log('index '+indexMatch+' no longer exists in queue. queue.js listen()');*/return}
+        if(queueLine[indexMatch]===undefined){return}
         queueLine[indexMatch].result=result;
         if(!waitRunning){return}						
-        setTimeout(()=>{this.start({indexMatch})},0)//set timeout is to take it out of the call stack
+        setTimeout(()=>{this.start({indexMatch})},0)
       }.bind(this,queueIndex),
       result:getPreviousResult(),
       evaluate:function(task,val){task.evaluation=val}.bind(this,queueLine[queueIndex]),
@@ -232,7 +227,7 @@ function Queue(){
 
   var more=()=>{return queueLine[queueIndex+1]}
 
-  this.moveOn=()=>{//move to the next step if it exists. if not, terminate/ should be the only way to advance
+  this.moveOn=()=>{//move to the next step if it exists. if not, terminate
     this.publishTask({task:queueLine[queueIndex]})
     if(!more() && !repeat){this.stop({terminate:true});return false}
     if(!repeat){queueIndex++}
@@ -249,7 +244,7 @@ function Queue(){
     clearTimeout(timeoutHandle)
     timeoutHandle=setTimeout(()=>{
       queueLine[queueIndex].timeout( getControlPackage({includeDone:false}) )
-      this.moveOn()//going to have to make this explicitly the devs responsibility or take this control off the table. 
+      this.moveOn()
     },queueLine[queueIndex].sec*1000)	
   }
   var getPreviousResult=()=>{
@@ -267,17 +262,17 @@ function Queue(){
 
   this.change=(p={})=>{
     queueLine.splice(queueIndex+1);
-    return this.add(p)//add will bookkeep
+    return this.add(p)
   }
 
-  this.interrupt=(p={})=>{//only performs the earlyTermination func..you have to then stop or moveon
+  this.interrupt=(p={})=>{
     var{and}=p
     if(queueLine[queueIndex]){queueLine[queueIndex].earlyTermination(getControlPackage({includeDone:false}))}
     if(and ==='stop'){this.stop()}else{this.moveOn()}
     return this
   }
 
-  this.splice=(p={})=>{//splices queueLine, but uses search  to find the indexes
+  this.splice=(p={})=>{
     var{replacement=[]}=p
     var {from,to}=getIndexes(p)//{action, index}
     if(from.index<queueIndex+1){console.log('from index'+from.index+' includes past/current tasks in the queue. setting from index to very next task index.')}
@@ -304,13 +299,14 @@ function Queue(){
     queueLine.pop();bookKeep();return this
   }
 
-  this.slice=function(p={}){//returns a new array with new shallow action object clones. setting their properties will not alter the action objects they were cloned from
+  this.slice=function(p={}){
+    //returns a new array with new shallow action object clones. setting their properties will not alter the action objects they were cloned from
     //however,performing methods on the sliced action objects will operate on the originals
     //and in fact some of the functions submitted will operate on important closure variables
-    var {from,to}=p.from||p.to?getIndexes(p):{from:{index:0}}//if none submitted, splice the whole queueline 
+    var {from,to}=p.from||p.to?getIndexes(p):{from:{index:0}}//if none submitted, splice the whole queueline
     if((to && from.index>to.index) || !from){
       console.error('indexes off->queue.js->get()',{from,to});return[]
-    }else{ //
+    }else{ 
       var args=to?[from.index,to.index]:[from.index]
       if(args.indexOf(undefined)!==-1){console.error(new Error('unable to find criteria'),from,to);return []}
       var ret=clearResults(queueLine.slice.apply(queueLine,args).map((val)=>{return Object.assign({},val)}))
@@ -329,23 +325,21 @@ function Queue(){
 
   this.find=function(p={}){
     return queueMap.get(p.name||p.index||p.taskObj||p.task)
-    //you could actually extend this to search by any criteria in the queueline
   }
 
   var bookKeep=()=>{//stores keys by name, index,task[the function to execute], action[the action package submitted] 
-    //tears map down and rebuilds because queueLine indexes shift
-    //modifying the queueLine calls bookKeep. renders containing loops order 5*A*N where A is the number of outer iterations and N is the number of tasks in the queue 
+    //tears map down and rebuilds because queueLine indexes shift 
     queueMap.clear();queueLength=queueLine.length
     for(var index=0;index<queueLength;index++){
       var action=queueLine[index]
-      var pack={action,index},task=action.task,name=action.name//take out the name and task for setting in map
+      var pack={action,index},task=action.task,name=action.name
       if(this.find({name})){console.error('duplicate names queue.js bookKeep',name,index)}
       if(this.find({taskObj:pack})){console.error('duplicate taskObjects. second dup. will be skipped. queue.js bookKeep',name,index)}
       if(this.find({task})){console.error('duplicate tasks, only the last inserted can be returned through find queue.js bookKeep',name,index)}
       if(name!==undefined){queueMap.set(name,pack)}
       queueMap.set(index,pack)
-      queueMap.set(action,pack)//duplicate packs??
-      queueMap.set(task,pack)//duplicate functions should be allowed.
+      queueMap.set(action,pack)
+      queueMap.set(task,pack)
     }
     if(!this.allDone()){terminated=false}
   }
@@ -452,7 +446,7 @@ function Queue(){
 
 Queue.wait=(time)=>{//time in ms
   if(typeof time==='object' &&time.from &&time.to){ var time=Math.random()*(time.to-time.from)}
-  var task=(p)=>{setTimeout(()=>{p.done(p.result);},time)}//pass previous result through					 
+  var task=(p)=>{setTimeout(()=>{p.done(p.result);},time)}				 
   return {task}
 }
 
@@ -466,19 +460,13 @@ Queue.queue=function(p={}){//starts another Queue instance and hooks up the call
 }
 
 
-Queue.promiseWrap=function(p={}){//creates a promise, hooks this queue up to that promise (through finally) and returns the promise
-  var{toDo}=p//async function, queue, promise
+Queue.promiseWrap=function(p={}){//creates a promise, hooks this queue up to that promise (using finally) and returns the promise
+  var{toDo}=p
   if(!toDo ||!toDo.constructor){console.log('wrong argument in promiseWrap queue.js argument submitted:',p);return}
   var resolve=function(res){
     if(toDo.constructor===Queue){
       this.finally(res)
     }
-    /*
-    tasks need a queue to activate them.
-    you might wrap an asynchronous function in a promise
-      hmm, queue should take asynchronous functions...
-    and other another promise?
-    */
   }
   return new Promise(resolve)
 }
@@ -494,7 +482,6 @@ Queue.promise=function(p={}){//wraps a queue in a task which does then->p.done
 
 //takes (query,data)  ,  ({query,data})  ,  ({taskParams, fetchPackage:{query,data}})
 Queue.fetch=function(pack={},data={}){
-  //format to {taskParams, fetchPackage:{query,data}} 
   if(!pack.fetchPackage){
     pack={
       fetchPackage:{
@@ -504,7 +491,6 @@ Queue.fetch=function(pack={},data={}){
     }  
   }
 
-  //check format a little bit
   if(!pack.fetchPackage.query){console.error('invalid fetchPackage subimtted to fetch in Queue', pack)}//use the package if it doesn't contain designated package for the fetch function
 
 
@@ -512,9 +498,9 @@ Queue.fetch=function(pack={},data={}){
     var prom=fetch(pack.fetchPackage.query,pack.fetchPackage.data)
     return prom instanceof Promise ? prom:new Promise(function(resolve){setTimeout(()=>{resolve()},0)
     })
-  }//Queue promise will extract the promise result and pass it down the queue
+  }
   
-  pack.wait=false//because you're returning a promise.
+  pack.wait=false
   return pack
 }
 Queue.ajax=function(p={}) {
@@ -581,12 +567,12 @@ Queue.race=function(p){
 
 Queue.all=function(p={},race){  
   var stalls=[]
-  var queue,useP=p.constructor===Array//is p the raw data or part of a package
+  var queue,useP=p.constructor===Array
   var actions=(useP?p:p.actions).map((val)=>{return format(val)})
   if(actions.length===0){return{}}
-  var doneHolder={done:()=>{}}//place holder for the allTask resolution function
+  var doneHolder={done:()=>{}}
   var check=()=>{return stalls.every(val=>val.resolved)}
-  var retrieve=function(i,result){//result is a status() request submitted by the finally call after each stall queue finishes. So an allTask returns an array of all the final status requests of all it's tasks.
+  var retrieve=function(i,result){
     stalls[i].result=result
     stalls[i].resolved=true	  
     if(race){doneHolder.done(result);check=()=>{return false}}
@@ -595,7 +581,7 @@ Queue.all=function(p={},race){
     }
   }
   actions.forEach(function(val,i){
-    queue=new Queue().add(val).finally(retrieve.bind(null,i))//queues should call back with the status report
+    queue=new Queue().add(val).finally(retrieve.bind(null,i))
     stalls[i]={queue,result:undefined,resolved:false}    
   })
   var earlyTermination=()=>{stalls.forEach((val)=>{if(val.queue){val.queue.interrupt({and:'stop'})}})}
@@ -651,7 +637,7 @@ Queue.blink=function(p={}){
       Queue.wait(interval*proportion)			
     )
   }
-  tasks.pop()//no need to wait after the last blink
+  tasks.pop()
   return tasks	
 }
 
@@ -674,13 +660,7 @@ Queue.synchTransform=function(p={}){//orig and dest should be strings
   return{orig:origArray.join(' '),dest:destArray.join(' ')}
 }
 
-
-//if(window.wait===undefined){window.wait=Queue.wait}
-//if(window.animate===undefined){window.animate=Queue.animate}
-//if(window.transition===undefined){window.transition=Queue.transition}
-
 var transformDefaultTable={
-  //matrices and perspective must be set already to animate
   translate:'translate(0,0)',	
   translate3d:'translate3d(0,0,0)',	
   translateX:'translateX(0)',	

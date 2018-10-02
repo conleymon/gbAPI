@@ -3,10 +3,10 @@ import {getFromServerThrottled} from 'get_from_server'
 
 import styles from 'style.scss'
 
-var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
+var getFromServer=getFromServerThrottled()
 
 export class SearchBox extends Component{
-    constructor(props){//label, default, buildQuery formatResponse, postChoose <-- return fetch ready arguments
+    constructor(props){
         super(props)
         this.searchRef=React.createRef()
         this.boxStyle={
@@ -26,20 +26,20 @@ export class SearchBox extends Component{
         var nullfunc=v=>v;
         nullfunc.native=true
 
-        this.buildQuery=()=>this.props.buildQuery  // function for building the query argument for fetch
-        // function for formatting the response from the server, final result should have the format :  [{value,content},{value2,content2}] where value is a string and content is jsx content
-        
+        this.buildQuery=()=>this.props.buildQuery  
+
+        //final result should have the format :  [{value,content},{value2,content2}] where value is a string and content is jsx content        
         this.formatResponse=()=>this.props.formatResponse||nullfunc 
         this.postChoose=()=>this.props.postChoose||(()=>{})
 
-        this.autoData=null//autocomplete server responses go here. formatResponse and get choices unpack it.  
+        this.autoData=null//autocomplete server responses go here  
         this.blockAutoComplete=false
     }
-    getValue(){//method for parents to retrieve value
+    getValue(){
         var value=this.searchRef.current.value
         return value===this.emptyVal()?'':value
     }
-    handleDefaultText(e){//clear if focused when empty, put default text if blurred when empty
+    handleDefaultText(e){//clear if focused when empty
         var input=this.searchRef.current
         var value=input.value
         if(e.type==='blur' && value===''){
@@ -65,8 +65,7 @@ export class SearchBox extends Component{
         )
         getFromServer(pack) 
     }
-    //each item should have format [{value,content},{value2,content2}]
-    getChoices(){//should be called inside render
+    getChoices(){
         if(this.autoData===null){return(<span></span>)}
         var formattedData=this.formatResponse()(this.autoData)
         if(!formattedData){return}
@@ -76,13 +75,10 @@ export class SearchBox extends Component{
         return choices
     }
     makeChoice(choice){
-        //clear choices
         this.autoData=null
-        //set the main value
         if(choice){this.searchRef.current.value=choice.value}
-        //rerender
+
         this.forceUpdate()
-        //call postChoose
         this.postChoose()(choice)
     }
     componentDidMount(){

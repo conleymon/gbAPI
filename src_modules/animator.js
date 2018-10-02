@@ -6,17 +6,17 @@ var ObjectAnimator=function(p={}){
   }
   this.synchTransInc=false
   this.orig={};this.dest={};this.src={}
-  this.fOrig={}//f stands for formatted
+  this.fOrig={}
   this.fDest={}
   this.contour='smooth';
   this.duration=500
   this.restoreDuration=()=>this.duration=500
   this.starttime=new Date().getTime();
   this.desttime=new Date().getTime()+1000;
-  this.offsettime=0//only during pause
+  this.offsettime=0
   this.interval=30
   this.animHandle='';
-  this.runningAnchor=false//general activity. all statuses:preanim, preinc,inc,postinc and postanim, running =true
+  this.runningAnchor=false
   this.running=()=>this.runningAnchor
   this.conductor=conductor	
   this.preInc=[];this.postInc=[];this.preAnim=[];this.postAnim=[]
@@ -26,7 +26,7 @@ var ObjectAnimator=function(p={}){
     return this
   }
 	
-  this.animate=function(){// call preanimation callbacks, set starttime & desttime, roll
+  this.animate=function(){
     this.runningAnchor=true
     for(var i=0;i<this.preAnim.length;i++){this.preAnim[i]()}
     this.starttime=this.now()
@@ -40,36 +40,22 @@ var ObjectAnimator=function(p={}){
     clearTimeout(this.animHandle)//stop timeout,
     if(pause){this.offsettime=this.now();runPostAnim=false}
     if(jumpToDest){
-      for(var i=0;i<this.preInc.length;i++){this.preInc[i]()}//run preInc calbacks
-      this.inc(this.fDest,this.src,this.fOrig,1)//assign to dest, 
-      for(var i=0;i<this.postInc.length;i++){this.postInc[i]()}//run postInc calbacks
+      for(var i=0;i<this.preInc.length;i++){this.preInc[i]()}
+      this.inc(this.fDest,this.src,this.fOrig,1) 
+      for(var i=0;i<this.postInc.length;i++){this.postInc[i]()}
     }
     if(runPostAnim){
-      for(var i=0;i<this.postAnim.length;i++){this.postAnim[i]()}//run postanimation calbacks
+      for(var i=0;i<this.postAnim.length;i++){this.postAnim[i]()}
     }
     this.runningAnchor=false
     return this
   }
 
-	//////untested code
-
-	this.pause=function(){this.stop({pause:true})}//untested, not in spec
-
-  this.unPause=function(){//untested, not in spec
-    var duration=this.now()-this.offsettime
-    this.starttime+=duration
-    this.desttime+=duration
-    this.offsettime=0
-    this.runningAnchor=true
-    this.startRoll()
-    return this
-  }
-	//////end untested code
   this.startRoll=function(){
     if(this.conductor){this.conductor.register({anim:this})}else{this.roll();}
   }
 
-  this.roll=function(){//self perpetuation, always delayed one iteration
+  this.roll=function(){
     if(this.running()){
       /*
       requestAnimationFrame(()=>{
@@ -86,17 +72,16 @@ var ObjectAnimator=function(p={}){
   }
 
   this.iterate=function(){
-    //preInc
     var perc=this.getProportion([this.starttime,this.desttime],this.now())
     if(perc>=1){this.stop({jumpToDest:true});return}
-    for(var i=0,len=this.preInc.length;i<len;i++){this.preInc[i]()}//run preInc calbacks    
+    for(var i=0,len=this.preInc.length;i<len;i++){this.preInc[i]()}
     var prog=this.mapProgress(perc);	  
-    this.inc(this.fDest,this.src,this.fOrig,prog)//inc only does the setting of variables
-    for(var i=0,len=this.postInc.length;i<len;i++){this.postInc[i]()}//run postInc calbacks
+    this.inc(this.fDest,this.src,this.fOrig,prog)
+    for(var i=0,len=this.postInc.length;i<len;i++){this.postInc[i]()}
     return this    
   }
 
-  this.update=function(){//callable from outside, immediate update
+  this.update=function(){
     this.iterate()
     return this
   }
@@ -107,17 +92,15 @@ var ObjectAnimator=function(p={}){
         if(dest[a].keeper===undefined){
         propagate(dest[a],src[a],orig[a])
       }
-      else{//dest prop is primitive. increment
-        //this is the anchor (hard coded animation)	
+      else{
         var finalValues=dest[a].val.map((n,i)=>{
           var ret= perc===1?
           dest[a].val[i]:
           orig[a].val[i]+(dest[a].val[i]-orig[a].val[i])*perc
           return dest[a].round?Math.round(ret):ret
-        })//increment each value in the val array
+        })
         var units=dest[a].units,counter=0
-        //repackage values for the src
-        var setval=units===''?finalValues[0]:units.replace(regexes.numberMarker,()=>{return finalValues[counter++]})//if there is some string context, insert the numbers
+        var setval=units===''?finalValues[0]:units.replace(regexes.numberMarker,()=>{return finalValues[counter++]})
         if(a==='transform' &&this.synchTransInc){
           var holder=this.synchTransform({orig:src[a],dest:setval})
           setval=holder.dest
@@ -152,9 +135,7 @@ var ObjectAnimator=function(p={}){
     }
   }
 	
-  this.loadAnimation=function(p){//src,dest,orig,duration,preInc,postInc,preAnim,postAnim , assumes p is writable
-    //sets orig, dest and src for a new animation
-    //orig should only be submitted if src is not reflective of the current object status, like a style sheet (getcomputedstyle would fetch an appropriate orig parameter)
+  this.loadAnimation=function(p){
     if(p.conductor){this.registerConductor(p.conductor)}
     this.preInc=[];this.postInc=[];this.preAnim=[];this.postAnim=[];this.fDest={};this.fOrig={};this.synchTransInc=false
     var err=this.validateAnimation(p);if(!err.status){console.error(err.message);return;}
@@ -179,34 +160,30 @@ var ObjectAnimator=function(p={}){
     
     for(var k in p){
       if(this.safeParams[k]){continue}
-      if(!this[k]){delete p[k];console.log('invalid parameter:'+k)}//conductor should be removed
+      if(!this[k]){delete p[k];console.log('invalid parameter:'+k)}
     }
     return valid
   }
 
   this.prepareAnimation=function(orig,dest,src,fOrig,fDest,stopProp){
     if(!stopProp){var stopProp={}}
-    //stopProp should be a number of further propagation steps. 0 means don't even copy the value. 1 copy and move on, 2 copy and enter one level. 
-    //but right now, it is only equipped for 0 or 1 
     var propagate=(orig,dest,src,fOrig,fDest,stopProp)=>{
       
       for (var a in dest){
-        //if props missing move right along
         if(src[a]===undefined){continue;}
         if(orig[a]===undefined){continue;}
-        //if this destination address is not primative, enter
         if(dest[a]!==null && typeof dest[a]==='object'){
           if(orig[a]!==null && typeof orig[a]==='object'){
             if(src[a]!==null && typeof src[a]==='object'){
               if(stopProp[a]!==undefined){if(stopProp[a]===1){src[a]=dest[a]};continue}
               if(dest[a].constructor===Array){fOrig[a]=[];fDest[a]=[]}else{fOrig[a]={};fDest[a]={}}
               propagate(orig[a],dest[a],src[a],fOrig[a],fDest[a],stopProp)
-            }else{continue;}//src prop not enterable
-          }else{continue;}//origprop not enterable
+            }else{continue;}
+          }else{continue;}
         }
-        else{//dest prop is primitive.
-          if(orig[a]===undefined){continue;}//missing prop
-          if(dest[a]===orig[a]){continue;}//values are the same
+        else{
+          if(orig[a]===undefined){continue;}
+          if(dest[a]===orig[a]){continue;}
           var useOrig=orig[a],useDest=dest[a]
           if(a==='transform'){
             var synched=this.synchTransform({orig:orig[a],dest:dest[a],synchTransInc:this.synchTransInc})
@@ -228,7 +205,6 @@ var ObjectAnimator=function(p={}){
   this.synchTransform=ObjectAnimator.synchTransform
   
   this.splitUnits=function(elem,propName){
-    //return {val,units,keeper} or null if not animatable 
     var round=false
     if(typeof elem==='number'){return {val:[elem],units:'',keeper:true,round}}
     if(typeof elem==='string'){
@@ -297,7 +273,7 @@ ObjectAnimator.removeConductor=function(conductor){
   ObjectAnimator.prototype.conductor=undefined
 }
 
-ObjectAnimator.synchTransform=function(p={}){//orig and dest should be strings
+ObjectAnimator.synchTransform=function(p={}){
   var{orig,dest,synchTransInc=false}=p,origArray=[],destArray=[],origU=new Map(),destU=new Map(),origVal
   var breakOrig=orig.match(/[a-zA-Z]+\([^\)]*\)/g),breakDest=dest.match(/[a-zA-Z]+\([^\)]*\)/g)
   if(breakOrig){breakOrig.forEach((val,i)=>{val=val.replace(/\s/g,'');origU.set(val.split('(')[0],val)})}
@@ -395,11 +371,9 @@ var hexToRGBA=function (hex) {
       return false;
     }
 		return{r, g, b, a:1}
-    //return [r, g, b];		
   }
 var makeSureRGBA=function(rgba){
   if(rgba.indexOf('rgba')>-1){return rgba}
-	//rgb(255,255,255)
 	rgba=rgba.replace('rgb','rgba')
 	rgba=rgba.replace('rgbaa','rgba')
 	var holder=rgba.split(')')

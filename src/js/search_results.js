@@ -4,7 +4,7 @@ import {Paginate} from 'paginate'
 import Paginator from 'paginator'
 import styles from 'style.scss'
 
-var getFromServer=getFromServerThrottled()//returns a function that will reschedule for calling every 200 milliseconds, until time ellapses without a new call
+var getFromServer=getFromServerThrottled()
 
 export class SearchResults extends Component{
     constructor(props){
@@ -19,7 +19,7 @@ export class SearchResults extends Component{
 
         this.makePages()
         this.result=null
-        this.status='ready'  //fetching, ready  
+        this.status='ready' 
         this.changePage=(page)=>{
             if(this.status!=='ready'){return}
             this.makePages(this.pageStatus.total_results,page)
@@ -28,7 +28,7 @@ export class SearchResults extends Component{
         this.ref=React.createRef()
     }
 
-    buildQuery(){//for now handles pages. takes the page requested and calculates tbe start index and adds it to the query
+    buildQuery(){
         var start=this.pageStatus.current_page-1
         if(start<0){start=0}
         return this.query
@@ -37,7 +37,7 @@ export class SearchResults extends Component{
     }
 
     getResult(){
-        var page=this.pageStatus.current_page //store the pagenumber for the gibberish decision*
+        var page=this.pageStatus.current_page
         var pack={
             query:this.buildQuery(),
             withResult:(result)=>{
@@ -51,28 +51,21 @@ export class SearchResults extends Component{
         getFromServer(pack)
         this.forceUpdate()        
     }
-    resolve(result, page){// resolve is called with the same page setting  
+    resolve(result, page){ 
         this.status='ready'
-        /*
-        cases
-            successful terms and pagenumber
-            gibberish terms, and there really are no results (fail or no result with page=0 request)
-            pagenumber exeeded
-        */
-        if(!result.status && result.items && result.items instanceof Array){//if successful, the result should be extracted            
+        if(!result.status && result.items && result.items instanceof Array){           
             this.result=result       
-            this.makePages(result.totalItems,this.pageStatus.current_page)//revise total pages based on results. (freezing requests during fetch is not decided at the time of this comment.)
+            this.makePages(result.totalItems,this.pageStatus.current_page)//revise total pages based on results.
         }
-        else if(page===0){//if the search terms were gibberish
+        else if(page===0){
             this.result=null
             this.makePages()
         }
-        //all other cases should do nothing
         this.forceUpdate()
     }
-    componentDidUpdate(){//the only thing the outside should be responsible for is the query
+    componentDidUpdate(){
         if(this.props.query!==this.query){
-            this.makePages()//resets pages and num results to 0
+            this.makePages()
             this.query=this.props.query
             this.status='fetching'
             this.forceUpdate()
@@ -109,7 +102,6 @@ export class SearchResults extends Component{
     }
 
     render(){
-        //you can check here if the state is different from the props
         var content
         if(this.status==='fetching'){content= (<span>Getting Results</span>)}
         else if(this.pageStatus.total_results===0){content= (<span>No Results</span>)}
