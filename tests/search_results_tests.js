@@ -100,19 +100,19 @@ describe(prefixId('Search Tests'),()=>{
             .add({
                 preCondition:()=>{return search.status === 'ready'},
                 task:() => {
-
                     expect( comparison[0].result.items.length, '1_items length' ).to.equal( search.resultsPerPage )
 
-
-                    expect( comparison[0].result.items ,'2 second page items should not equal the first page').to.not.deep.equal( comparison[1].result.items )
+                    var matchPercent = getMatchPercent(comparison[0].result.items , comparison[1].result.items)
+                    expect( matchPercent, '2 second page items should not equal the first page').to.satisfy((v)=>{return v<=.1})
                     expect( comparison[0].query , '3 query should be the same between page changes' ).to.equal( comparison[1].query )                    
                     expect( comparison[1].page , '4 and you should be on the third page').to.equal( 3 )
 
-                    expect( comparison[0].result.items ,'5 make sure the query and results change when new query is submitted' ).to.not.deep.equal( comparison[2].result.items )
+                    var matchPercent = getMatchPercent(comparison[0].result.items , comparison[2].result.items)
+                    expect( matchPercent, '5 make sure the query and results change when new query is submitted').to.satisfy((v)=>{return v<=.1})
                     expect( comparison[2].page , '6 first page after query change ').to.equal( 0 )
 
-                    expect( comparison[0].result.items, '7 same query and pagenumber should fetching matching items').to.deep.equal( comparison[3].result.items )
-
+                    var matchPercent = getMatchPercent(comparison[0].result.items , comparison[3].result.items)
+                    expect( matchPercent, '7 same query and pagenumber should fetching matching items').to.satisfy((v)=>{return v>=.9})
                 }
             })
             .add( () => done() )
@@ -121,6 +121,17 @@ describe(prefixId('Search Tests'),()=>{
     }).timeout(7000)
 })
 
+var getMatchPercent=function(comp1,comp2){
+    var match=0, num=comp1.length
+    var checkRegistry={}
+    comp1.forEach((v)=>{
+        checkRegistry[v.id]=1
+    })
+    comp2.forEach((v)=>{
+        if(checkRegistry[v.id]){match++}
+    })
+    return match/num
+}
 
 
 

@@ -13,7 +13,7 @@
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "react-paginate": "^5.2.4",
-    "write": "^1.0.3"
+    "write":"^1.0.3"
   },
   "devDependencies": {
     "auto-prefixer": "^0.4.2",
