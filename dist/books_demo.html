@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
     <head>
         <style>
@@ -18,12 +19,12 @@
     <body>
         Main/Parent App
         <div class='container'></div>
-    </body>
+        <script src="js/google_books_api_bundle.js"></script>
+        <script>
+            var Books=new VolumesAPI()
+            Books.render({
+                container:document.querySelector('.container')
+            })
+        </script>
+        </body>
 </html>
-<script src="js/google_books_api_bundle.js"></script>
-<script >
-    var Books=new VolumesAPI()
-    Books.render({
-        container:document.querySelector('.container')
-    })
-</script>
